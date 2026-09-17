@@ -547,14 +547,15 @@ function RegisterScreen({ nav }: { nav: (s: Screen) => void }) {
       <div className="flex-1 px-5 pt-2 pb-6 flex flex-col gap-4">
         <InputField label="الاسم الكامل" placeholder="د. محمد الشمري" icon={<IcUser c="w-5 h-5" />} />
         <div className="flex flex-col gap-1.5">
-          <label className="text-[13px] font-semibold text-[#374040]">الدولة / رقم الهاتف</label>
+          <label className="text-[13px] font-semibold text-[#374040]">رقم واتساب</label>
           <div className="flex items-center bg-[#F8FAFA] border border-[#E0EDED] rounded-xl overflow-hidden">
             <div className="flex items-center gap-2 px-3 py-3.5 border-l border-[#E0EDED] text-[13px] font-semibold text-[#374040] flex-shrink-0">
               <span>🇾🇪</span><span>+967</span>
               <IcChevronLeft c="w-3 h-3 text-[#B0C4C4]" />
             </div>
-            <input placeholder="5X XXX XXXX" className="flex-1 bg-transparent px-3 py-3.5 text-[14px] placeholder:text-[#B0C4C4] focus:outline-none" />
+            <input placeholder="7XX XXX XXX" className="flex-1 bg-transparent px-3 py-3.5 text-[14px] placeholder:text-[#B0C4C4] focus:outline-none" />
           </div>
+          <p className="text-[12px] text-[#8A9E9E] mt-0.5">سيتم إرسال رمز التحقق إلى هذا الرقم عبر واتساب</p>
         </div>
         <InputField label="البريد الإلكتروني" placeholder="example@domain.com" type="email" icon={<IcMail c="w-5 h-5" />} />
         <InputField label="كلمة المرور" placeholder="8 أحرف على الأقل" type="password" icon={<IcLock c="w-5 h-5" />} />
@@ -592,7 +593,7 @@ function OTPScreen({ nav }: { nav: (s: Screen) => void }) {
         </div>
         <div className="text-center">
           <p className="text-[15px] font-semibold text-[#1A2424]">تم إرسال رمز التحقق إلى رقمك عبر واتساب</p>
-          <p className="text-[14px] text-teal-primary font-bold mt-1">+967 5X XXX XXXX</p>
+          <p className="text-[14px] text-teal-primary font-bold mt-1" dir="ltr">+967 7XX XXX XXX</p>
         </div>
         {/* OTP inputs */}
         <div className="flex gap-3 justify-center">
@@ -609,7 +610,7 @@ function OTPScreen({ nav }: { nav: (s: Screen) => void }) {
         <div className="w-full flex flex-col gap-3 mt-4">
           <Btn onClick={() => nav('specialty')}>تحقق من الرمز</Btn>
           <Btn variant="secondary">إعادة إرسال الرمز</Btn>
-          <button className="text-[13px] text-[#8A9E9E] py-2">تغيير رقم الجوال</button>
+          <button className="text-[13px] text-[#8A9E9E] py-2">تغيير رقم واتساب</button>
         </div>
         <div className="flex items-start gap-2 bg-blue-50 rounded-xl px-4 py-3 w-full">
           <svg className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -625,8 +626,14 @@ function OTPScreen({ nav }: { nav: (s: Screen) => void }) {
 function SpecialtyScreen({ nav }: { nav: (s: Screen) => void }) {
   const [specialty, setSpecialty] = useState('')
   const [title, setTitle] = useState('')
-  const specialties = ['طب عام', 'أمراض باطنية', 'جراحة عامة', 'أطفال', 'نساء وتوليد', 'عظام', 'قلب', 'أعصاب', 'عيون', 'أنف وأذن وحنجرة', 'جلدية', 'نفسية']
+  const [customSpecialty, setCustomSpecialty] = useState('')
+  const [uploadedDoc, setUploadedDoc] = useState<{ name: string; size: string } | null>(null)
+  const specialties = ['طب عام', 'أمراض باطنية', 'جراحة عامة', 'أطفال', 'نساء وتوليد', 'عظام', 'قلب', 'أعصاب', 'عيون', 'أنف وأذن وحنجرة', 'جلدية', 'نفسية', 'تخصص آخر غير موجود']
   const titles = ['طبيب عام', 'أخصائي', 'استشاري', 'أستاذ دكتور']
+  const handleFilePick = () => {
+    // Simulate file selection
+    setUploadedDoc({ name: 'شهادة_مزاولة_المهنة.pdf', size: '1.2 MB' })
+  }
   return (
     <div className="flex-1 flex flex-col bg-white overflow-y-auto">
       <StatusBar />
@@ -634,13 +641,14 @@ function SpecialtyScreen({ nav }: { nav: (s: Screen) => void }) {
         <button onClick={() => nav('otp')} className="w-9 h-9 flex items-center justify-center rounded-xl text-[#374040]">
           <IcChevronRight c="w-5 h-5" />
         </button>
-        <h1 className="flex-1 text-center text-[17px] font-bold text-[#1A2424]">التخصص والمسمى المهني</h1>
+        <h1 className="flex-1 text-center text-[17px] font-bold text-[#1A2424]">البيانات المهنية</h1>
         <div className="w-9" />
       </div>
       <div className="flex-1 px-5 pt-2 pb-6 flex flex-col gap-5">
         <div className="bg-teal-50 rounded-2xl p-4">
-          <p className="text-[13px] text-teal-primary font-semibold">خطوة أخيرة! حدد تخصصك لنتمكن من تخصيص تجربتك في DocGate</p>
+          <p className="text-[13px] text-teal-primary font-semibold">أدخل بياناتك المهنية حتى يتمكن المرضى من العثور عليك في DocGate</p>
         </div>
+        {/* Specialty */}
         <div className="flex flex-col gap-1.5">
           <label className="text-[13px] font-semibold text-[#374040]">التخصص الطبي</label>
           <select
@@ -652,6 +660,19 @@ function SpecialtyScreen({ nav }: { nav: (s: Screen) => void }) {
             {specialties.map(s => <option key={s}>{s}</option>)}
           </select>
         </div>
+        {specialty === 'تخصص آخر غير موجود' && (
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[13px] font-semibold text-[#374040]">التخصص الطبي</label>
+            <input
+              type="text"
+              placeholder="أدخل تخصصك الطبي"
+              value={customSpecialty}
+              onChange={e => setCustomSpecialty(e.target.value)}
+              className="w-full bg-[#F8FAFA] border border-[#E0EDED] rounded-xl px-4 py-3.5 text-[14px] text-[#1A2424] placeholder:text-[#B0C4C4] focus:outline-none focus:border-teal-primary"
+            />
+          </div>
+        )}
+        {/* Professional Title */}
         <div className="flex flex-col gap-1.5">
           <label className="text-[13px] font-semibold text-[#374040]">المسمى المهني</label>
           <div className="flex flex-wrap gap-2">
@@ -666,9 +687,63 @@ function SpecialtyScreen({ nav }: { nav: (s: Screen) => void }) {
             ))}
           </div>
         </div>
-        <div className="mt-auto flex flex-col gap-3 pt-4">
-          <Btn onClick={() => nav('account-ready')}>التالي</Btn>
-          <button onClick={() => nav('account-ready')} className="text-[13px] text-[#8A9E9E] py-2">تخطي الآن</button>
+        {/* Professional Document Upload */}
+        <div className="flex flex-col gap-3">
+          <div>
+            <p className="text-[14px] font-bold text-[#1A2424]">توثيق المهنة</p>
+            <p className="text-[12px] text-[#8A9E9E] mt-0.5">ارفع وثيقة تساعدنا على التحقق من بياناتك المهنية</p>
+          </div>
+          {!uploadedDoc ? (
+            <button
+              onClick={handleFilePick}
+              className="w-full border-2 border-dashed border-[#C5E0E0] rounded-2xl p-5 flex flex-col items-center gap-2 text-center bg-[#F8FAFA] hover:bg-teal-50 hover:border-teal-primary transition-all"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-teal-50 flex items-center justify-center">
+                <svg className="w-6 h-6 text-teal-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+              </div>
+              <p className="text-[14px] font-bold text-[#1A2424]">رفع وثيقة التحقق المهني</p>
+              <p className="text-[12px] text-[#8A9E9E]">شهادة مزاولة المهنة أو الشهادة الجامعية</p>
+              <div className="flex items-center gap-2 mt-1">
+                {['PDF', 'JPG', 'PNG'].map(fmt => (
+                  <span key={fmt} className="text-[11px] font-semibold text-teal-primary bg-teal-50 border border-teal-100 rounded-lg px-2 py-0.5">{fmt}</span>
+                ))}
+              </div>
+            </button>
+          ) : (
+            <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-teal-primary/10 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-teal-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0 text-right">
+                  <p className="text-[13px] font-bold text-[#1A2424] truncate">{uploadedDoc.name}</p>
+                  <p className="text-[11px] text-[#8A9E9E]">{uploadedDoc.size}</p>
+                </div>
+                <IcCheck c="w-5 h-5 text-teal-primary flex-shrink-0" />
+              </div>
+              <div className="flex items-center gap-2 mt-3">
+                <button onClick={() => setUploadedDoc(null)} className="flex-1 text-[12px] font-semibold text-red-500 border border-red-200 rounded-xl py-2 bg-white">حذف</button>
+                <button onClick={handleFilePick} className="flex-1 text-[12px] font-semibold text-teal-primary border border-teal-200 rounded-xl py-2 bg-white">استبدال</button>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="mt-auto flex flex-col gap-3 pt-2">
+          <Btn
+            disabled={!(
+              specialty !== '' &&
+              (specialty !== 'تخصص آخر غير موجود' || customSpecialty.trim().length > 0) &&
+              title !== '' &&
+              uploadedDoc !== null
+            )}
+            onClick={() => nav('onboarding-location')}
+          >
+            التالي
+          </Btn>
         </div>
       </div>
     </div>
@@ -1138,7 +1213,7 @@ function WorkLocationOverviewScreen({ nav }: { nav: (s: Screen) => void }) {
 
 // ── Weekly Schedule ────────────────────────────────────────────────────
 
-function WeeklyScheduleScreen({ nav }: { nav: (s: Screen) => void }) {
+function WeeklyScheduleScreen({ nav, onboarding = false }: { nav: (s: Screen) => void; onboarding?: boolean }) {
   const [schedTab, setSchedTab] = useState<'weekly'>('weekly')
 
   const weekDays = [
@@ -1157,7 +1232,7 @@ function WeeklyScheduleScreen({ nav }: { nav: (s: Screen) => void }) {
       <div className="bg-teal-primary flex-shrink-0">
         <StatusBar dark />
         <div className="flex items-center px-4 py-3 gap-3">
-          <button onClick={() => nav('appointments')} className="w-9 h-9 flex items-center justify-center text-white">
+          <button onClick={() => nav(onboarding ? 'onboarding-location' : 'appointments')} className="w-9 h-9 flex items-center justify-center text-white">
             <IcChevronRight c="w-5 h-5" />
           </button>
           <h1 className="flex-1 text-center text-[17px] font-bold text-white">الجدول الزمني</h1>
@@ -1205,9 +1280,11 @@ function WeeklyScheduleScreen({ nav }: { nav: (s: Screen) => void }) {
               <IcPlus c="w-4 h-4" />
               إضافة جلسة لأحد الأيام
             </Btn>
-            <Btn onClick={() => nav('schedule-done')} className="mt-1">
-              حفظ الجدول
-            </Btn>
+            {onboarding ? (
+              <Btn onClick={() => nav('schedule-done')} className="mt-1">حفظ الجدول</Btn>
+            ) : (
+              <Btn onClick={() => nav('weekly-schedule')} className="mt-1">حفظ الجدول</Btn>
+            )}
           </div>
         </div>
       )}
@@ -3332,6 +3409,8 @@ function RecoveryOTPScreen({ nav }: { nav: (s: Screen) => void }) {
 }
 
 function AccountReadyScreen({ nav }: { nav: (s: Screen) => void }) {
+  // This screen is bypassed in the new onboarding flow (specialty → onboarding-location directly)
+  // Kept for the password-reset flow (recovery-otp still references it)
   return (
     <div className="flex-1 flex flex-col bg-white items-center justify-center px-6">
       <StatusBar />
@@ -3340,11 +3419,11 @@ function AccountReadyScreen({ nav }: { nav: (s: Screen) => void }) {
           <IcCheck c="w-12 h-12 text-green-600" />
         </div>
         <div className="text-center">
-          <h1 className="text-[22px] font-extrabold text-[#1A2424]">تم تفعيل الحساب</h1>
-          <p className="text-[14px] text-[#8A9E9E] mt-2">مرحباً بك في DocGate، الآن يمكنك الدخول إلى لوحة التحكم والبدء بإدارة ممارستك الطبية.</p>
+          <h1 className="text-[22px] font-extrabold text-[#1A2424]">تم تعيين كلمة المرور</h1>
+          <p className="text-[14px] text-[#8A9E9E] mt-2">يمكنك الآن تسجيل الدخول بكلمة المرور الجديدة.</p>
         </div>
         <div className="w-full flex flex-col gap-3 mt-4">
-          <Btn onClick={() => nav('schedule-setup')}>الدخول إلى DocGate</Btn>
+          <Btn onClick={() => nav('home')}>تسجيل الدخول</Btn>
         </div>
       </div>
     </div>
@@ -4199,6 +4278,9 @@ function ProfileCertificatesScreen({ nav }: { nav: (s: Screen) => void }) {
 // ── Schedule Setup Onboarding ──────────────────────────────────────────
 
 function ScheduleSetupScreen({ nav }: { nav: (s: Screen) => void }) {
+  // This intermediate screen is now bypassed in the new onboarding flow.
+  // OnboardingLocationScreen goes directly to weekly-schedule.
+  // Keeping for potential direct navigation from other parts of the app.
   return (
     <div className="flex-1 flex flex-col bg-white">
       <StatusBar />
@@ -4207,17 +4289,8 @@ function ScheduleSetupScreen({ nav }: { nav: (s: Screen) => void }) {
           <IcCalendar c="w-12 h-12 text-teal-primary" />
         </div>
         <div className="text-center">
-          <h1 className="text-[22px] font-extrabold text-[#1A2424] mb-3">لنبدأ بإعداد جدولك</h1>
+          <h1 className="text-[22px] font-extrabold text-[#1A2424] mb-3">إعداد الجدول</h1>
           <p className="text-[14px] text-[#5A7070] leading-relaxed">حدد أيام وساعات عملك حتى يتمكن المرضى من معرفة المواعيد المتاحة للحجز.</p>
-        </div>
-        <div className="bg-teal-50 rounded-2xl p-4 border border-teal-100 w-full">
-          <p className="text-[13px] font-bold text-teal-primary mb-2">ما ستُعدّه الآن:</p>
-          {['أيام العمل (السبت – الجمعة)', 'ساعات بداية ونهاية الدوام', 'مدة كل استشارة', 'جلسات متعددة إذا لزم'].map((item, i) => (
-            <div key={i} className="flex items-center gap-2 py-1">
-              <IcCheck c="w-4 h-4 text-teal-primary flex-shrink-0" />
-              <p className="text-[13px] text-[#374040]">{item}</p>
-            </div>
-          ))}
         </div>
         <div className="w-full flex flex-col gap-3">
           <Btn onClick={() => nav('onboarding-location')}>
@@ -4233,16 +4306,45 @@ function ScheduleSetupScreen({ nav }: { nav: (s: Screen) => void }) {
   )
 }
 
+const MOCK_FACILITIES = [
+  { name: 'مركز المدينة الطبي', type: 'مركز طبي', city: 'عدن – المنصورة', verified: true },
+  { name: 'مستشفى الجمهورية التعليمي', type: 'مستشفى تعليمي', city: 'عدن – خور مكسر', verified: true },
+  { name: 'مستشفى عدن العام', type: 'مستشفى عام', city: 'عدن', verified: true },
+  { name: 'مستشفى 22 مايو', type: 'مستشفى عام', city: 'عدن – المنصورة', verified: true },
+  { name: 'مستشفى الصداقة التعليمي', type: 'مستشفى تعليمي', city: 'عدن – الشيخ عثمان', verified: false },
+  { name: 'مركز الصحة الأول', type: 'مركز صحي', city: 'عدن – كريتر', verified: false },
+]
+
 function OnboardingLocationScreen({ nav }: { nav: (s: Screen) => void }) {
   const [selected, setSelected] = useState<'existing' | 'new' | null>(null)
+  const [showFacilitySearch, setShowFacilitySearch] = useState(false)
+  const [facilityQuery, setFacilityQuery] = useState('')
+  const [selectedFacility, setSelectedFacility] = useState<{ name: string; type: string; city: string } | null>(null)
+  const [newName, setNewName] = useState('')
+  const [newType, setNewType] = useState('')
+  const [newCity, setNewCity] = useState('')
+  const [newAddress, setNewAddress] = useState('')
+
+  const filteredFacilities = MOCK_FACILITIES.filter(f =>
+    facilityQuery.trim() === '' ||
+    f.name.includes(facilityQuery) ||
+    f.city.includes(facilityQuery)
+  )
+
+  const canContinue = selected === 'existing'
+    ? !!selectedFacility
+    : selected === 'new'
+      ? (newName.trim().length > 0 && newType.trim().length > 0 && newCity.trim().length > 0 && newAddress.trim().length > 0)
+      : false
+
   return (
-    <div className="flex-1 flex flex-col bg-white overflow-y-auto">
+    <div className="flex-1 flex flex-col bg-white overflow-y-auto relative">
       <StatusBar />
       <div className="flex items-center px-4 py-3 border-b border-[#E8F0F0]">
-        <button onClick={() => nav('schedule-setup')} className="w-9 h-9 flex items-center justify-center rounded-xl text-[#374040]">
+        <button onClick={() => nav('specialty')} className="w-9 h-9 flex items-center justify-center rounded-xl text-[#374040]">
           <IcChevronRight c="w-5 h-5" />
         </button>
-        <h1 className="flex-1 text-center text-[17px] font-bold text-[#1A2424]">موقع العمل</h1>
+        <h1 className="flex-1 text-center text-[17px] font-bold text-[#1A2424]">مواقع العمل</h1>
         <div className="w-9" />
       </div>
       <div className="flex-1 px-5 py-6 flex flex-col gap-5 text-right">
@@ -4251,7 +4353,7 @@ function OnboardingLocationScreen({ nav }: { nav: (s: Screen) => void }) {
           <p className="text-[13px] text-[#8A9E9E]">اختر المنشأة التي ستعمل فيها أولاً لإعداد جدولك.</p>
         </div>
         <div className="flex flex-col gap-3">
-          <button onClick={() => setSelected('existing')}
+          <button onClick={() => { setSelected('existing'); setSelectedFacility(null) }}
             className={cn('p-4 rounded-2xl border-2 text-right transition-all flex items-center gap-4',
               selected === 'existing' ? 'border-teal-primary bg-teal-50' : 'border-[#E8F0F0] bg-white')}>
             <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0', selected === 'existing' ? 'bg-teal-primary' : 'bg-[#F0F4F4]')}>
@@ -4262,7 +4364,7 @@ function OnboardingLocationScreen({ nav }: { nav: (s: Screen) => void }) {
               <p className="text-[12px] text-[#8A9E9E] mt-0.5">ابحث عن مستشفى أو مركز طبي مسجّل في DocGate</p>
             </div>
           </button>
-          <button onClick={() => setSelected('new')}
+          <button onClick={() => { setSelected('new'); setSelectedFacility(null) }}
             className={cn('p-4 rounded-2xl border-2 text-right transition-all flex items-center gap-4',
               selected === 'new' ? 'border-teal-primary bg-teal-50' : 'border-[#E8F0F0] bg-white')}>
             <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0', selected === 'new' ? 'bg-teal-primary' : 'bg-[#F0F4F4]')}>
@@ -4274,57 +4376,168 @@ function OnboardingLocationScreen({ nav }: { nav: (s: Screen) => void }) {
             </div>
           </button>
         </div>
+
+        {/* Existing facility: show selected or search trigger */}
         {selected === 'existing' && (
-          <div className="bg-[#F8FAFA] rounded-2xl border border-[#E8F0F0] p-4">
-            <p className="text-[12px] font-bold text-[#8A9E9E] mb-2">المنشآت المقترحة — عدن</p>
-            {['مركز المدينة الطبي · عدن – المنصورة', 'مستشفى الجمهورية التعليمي · خور مكسر', 'مستشفى عدن العام'].map((loc, i) => (
-              <button key={i} onClick={() => nav('weekly-schedule')}
-                className="w-full flex items-center justify-between py-2.5 border-b border-[#E8F0F0] last:border-0">
-                <IcChevronLeft c="w-4 h-4 text-[#B0C4C4]" />
-                <p className="text-[13px] text-[#374040] font-semibold">{loc}</p>
+          !selectedFacility ? (
+            <button
+              onClick={() => setShowFacilitySearch(true)}
+              className="w-full flex items-center justify-between border-2 border-dashed border-teal-200 rounded-2xl px-4 py-4 bg-teal-50/50 hover:bg-teal-50 transition-all"
+            >
+              <IcSearch c="w-5 h-5 text-teal-primary" />
+              <p className="text-[14px] font-semibold text-teal-primary flex-1 text-right mx-3">ابحث عن منشأة</p>
+              <IcChevronLeft c="w-4 h-4 text-teal-primary" />
+            </button>
+          ) : (
+            <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-teal-primary flex items-center justify-center flex-shrink-0">
+                <IcBuilding c="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0 text-right">
+                <p className="text-[14px] font-bold text-[#1A2424]">{selectedFacility.name}</p>
+                <p className="text-[12px] text-[#8A9E9E]">{selectedFacility.type} · {selectedFacility.city}</p>
+              </div>
+              <button onClick={() => setSelectedFacility(null)} className="text-[12px] text-teal-primary font-semibold border border-teal-200 rounded-lg px-2 py-1 bg-white flex-shrink-0">
+                تغيير
               </button>
-            ))}
-          </div>
+            </div>
+          )
         )}
+
+        {/* New workplace form */}
         {selected === 'new' && (
           <div className="flex flex-col gap-3">
-            <InputField label="اسم المنشأة" placeholder="عيادة د. أحمد سالم" />
-            <InputField label="نوع المنشأة" placeholder="عيادة خاصة" />
-            <InputField label="المدينة" placeholder="عدن" />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[13px] font-semibold text-[#374040]">اسم المنشأة</label>
+              <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="عيادة د. أحمد سالم" className="w-full bg-[#F8FAFA] border border-[#E0EDED] rounded-xl px-4 py-3.5 text-[14px] text-[#1A2424] placeholder:text-[#B0C4C4] focus:outline-none focus:border-teal-primary" />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[13px] font-semibold text-[#374040]">نوع المنشأة</label>
+              <input value={newType} onChange={e => setNewType(e.target.value)} placeholder="عيادة خاصة" className="w-full bg-[#F8FAFA] border border-[#E0EDED] rounded-xl px-4 py-3.5 text-[14px] text-[#1A2424] placeholder:text-[#B0C4C4] focus:outline-none focus:border-teal-primary" />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[13px] font-semibold text-[#374040]">المدينة</label>
+              <input value={newCity} onChange={e => setNewCity(e.target.value)} placeholder="عدن" className="w-full bg-[#F8FAFA] border border-[#E0EDED] rounded-xl px-4 py-3.5 text-[14px] text-[#1A2424] placeholder:text-[#B0C4C4] focus:outline-none focus:border-teal-primary" />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[13px] font-semibold text-[#374040]">العنوان</label>
+              <input value={newAddress} onChange={e => setNewAddress(e.target.value)} placeholder="المنطقة، الشارع، أقرب معلم" className="w-full bg-[#F8FAFA] border border-[#E0EDED] rounded-xl px-4 py-3.5 text-[14px] text-[#1A2424] placeholder:text-[#B0C4C4] focus:outline-none focus:border-teal-primary" />
+            </div>
           </div>
         )}
-        <Btn disabled={!selected} onClick={() => nav('weekly-schedule')} className="mt-auto">
+
+        <Btn disabled={!canContinue} onClick={() => nav('weekly-schedule')} className="mt-auto">
           المتابعة لإعداد الجدول
         </Btn>
       </div>
+
+      {/* Facility Search Modal */}
+      {showFacilitySearch && (
+        <div className="absolute inset-0 bg-black/40 flex flex-col justify-end z-50" onClick={() => setShowFacilitySearch(false)}>
+          <div className="bg-white rounded-t-3xl flex flex-col" style={{ maxHeight: '75%' }} onClick={e => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8F0F0]">
+              <button onClick={() => setShowFacilitySearch(false)} className="w-8 h-8 flex items-center justify-center rounded-xl text-[#8A9E9E] bg-[#F0F4F4]">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+              <p className="text-[16px] font-bold text-[#1A2424]">اختيار منشأة موجودة</p>
+              <div className="w-8" />
+            </div>
+            {/* Search input */}
+            <div className="px-4 py-3">
+              <div className="flex items-center gap-2 bg-[#F8FAFA] border border-[#E0EDED] rounded-xl px-3 py-2.5">
+                <IcSearch c="w-4 h-4 text-[#B0C4C4]" />
+                <input
+                  autoFocus
+                  placeholder="ابحث باسم المنشأة أو المدينة"
+                  value={facilityQuery}
+                  onChange={e => setFacilityQuery(e.target.value)}
+                  className="flex-1 bg-transparent text-[13px] text-[#1A2424] placeholder:text-[#B0C4C4] focus:outline-none text-right"
+                />
+                {facilityQuery && (
+                  <button onClick={() => setFacilityQuery('')} className="text-[#B0C4C4]">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                )}
+              </div>
+            </div>
+            {/* Results */}
+            <div className="flex-1 overflow-y-auto px-4 pb-4">
+              {filteredFacilities.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 gap-2">
+                  <IcBuilding c="w-10 h-10 text-[#D0DEDE]" />
+                  <p className="text-[13px] text-[#B0C4C4]">لا توجد نتائج مطابقة</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {filteredFacilities.map((f, i) => (
+                    <button key={i}
+                      onClick={() => { setSelectedFacility(f); setShowFacilitySearch(false); setFacilityQuery('') }}
+                      className="w-full bg-white border border-[#E8F0F0] rounded-2xl p-4 flex items-center gap-3 text-right hover:border-teal-primary hover:bg-teal-50 transition-all"
+                    >
+                      <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center flex-shrink-0">
+                        <IcBuilding c="w-5 h-5 text-teal-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 justify-end">
+                          {f.verified && <span className="text-[10px] text-green-600 font-semibold bg-green-50 px-1.5 py-0.5 rounded-full flex-shrink-0">موثق</span>}
+                          <p className="text-[13px] font-bold text-[#1A2424] truncate">{f.name}</p>
+                        </div>
+                        <p className="text-[12px] text-[#8A9E9E] mt-0.5">{f.type} · {f.city}</p>
+                      </div>
+                      <IcChevronLeft c="w-4 h-4 text-[#B0C4C4] flex-shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 function ScheduleDoneScreen({ nav }: { nav: (s: Screen) => void }) {
   return (
-    <div className="flex-1 flex flex-col bg-white items-center justify-center px-6">
+    <div className="flex-1 flex flex-col bg-white overflow-y-auto">
       <StatusBar />
-      <div className="flex-1 flex flex-col items-center justify-center gap-6 text-center">
+      <div className="flex-1 flex flex-col items-center justify-center gap-5 px-6 py-8 text-center">
+        {/* Success icon */}
         <div className="w-24 h-24 rounded-full bg-teal-100 flex items-center justify-center">
           <IcCheck c="w-12 h-12 text-teal-primary" />
         </div>
         <div>
-          <h1 className="text-[22px] font-extrabold text-[#1A2424] mb-3">تم إعداد جدولك بنجاح</h1>
-          <p className="text-[14px] text-[#5A7070] leading-relaxed">أصبح بإمكان المرضى الآن رؤية مواعيدك والحجز معك.</p>
+          <h1 className="text-[22px] font-extrabold text-[#1A2424] mb-2">تم إعداد حسابك بنجاح</h1>
+          <p className="text-[14px] text-[#5A7070] leading-relaxed">
+            تم حفظ بياناتك المهنية وموقع العمل وجدول المواعيد.
+          </p>
         </div>
+        {/* Schedule summary */}
         <div className="bg-teal-50 rounded-2xl p-4 border border-teal-100 w-full text-right">
           <p className="text-[12px] font-bold text-[#8A9E9E] mb-2">ملخص الجدول</p>
           <p className="text-[13px] text-[#374040]">السبت – الخميس · يعمل</p>
           <p className="text-[13px] text-[#374040]">08:00 ص – 01:00 م · 15 دقيقة/موعد</p>
           <p className="text-[13px] text-[#8A9E9E] mt-1">الجمعة · إجازة أسبوعية</p>
         </div>
-        <div className="w-full flex flex-col gap-3">
-          <Btn onClick={() => nav('schedule-30day')}>
-            <IcCalendar c="w-5 h-5" />
-            عرض الأيام الـ30 القادمة
+        {/* Verification pending notice */}
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 w-full text-right">
+          <div className="flex items-center justify-end gap-2 mb-1.5">
+            <p className="text-[14px] font-bold text-amber-800">طلب التوثيق قيد المراجعة</p>
+            <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+              <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+          <p className="text-[12px] text-amber-700 leading-relaxed">
+            سيقوم فريق DocGate بمراجعة بياناتك والوثيقة المرفقة، وسيتم إشعارك عند توثيق حسابك.
+          </p>
+        </div>
+        <div className="w-full flex flex-col gap-3 mt-2">
+          <Btn onClick={() => nav('home')}>
+            الانتقال إلى لوحة التحكم
           </Btn>
-          <Btn variant="secondary" onClick={() => nav('home')}>الذهاب إلى الصفحة الرئيسية</Btn>
         </div>
       </div>
     </div>
@@ -4336,10 +4549,13 @@ function ScheduleDoneScreen({ nav }: { nav: (s: Screen) => void }) {
 export default function App() {
   const [screen, setScreen] = useState<Screen>('welcome')
   const [activeTab, setActiveTab] = useState<NavTab>('home')
+  const [onboardingMode, setOnboardingMode] = useState(false)
 
   const nav = (s: Screen) => {
     setScreen(s)
-    if (s === 'home') setActiveTab('home')
+    if (s === 'register') setOnboardingMode(true)
+    if (s === 'welcome' || s === 'login') setOnboardingMode(false)
+    if (s === 'home') { setOnboardingMode(false); setActiveTab('home') }
     else if (s === 'appointments' || s === 'bookings' || s === 'booking-details' || s === 'booking-checkin' || s === 'booking-cancel' || s === 'reschedule' || s === 'reschedule-success' || s === 'weekly-schedule' || s === 'schedule-30day') setActiveTab('appointments')
     else if (s === 'messages') setActiveTab('messages')
     else if (s === 'more' || s === 'patients' || s === 'patient-controls' || s === 'finance' || s === 'finance-transactions' || s === 'finance-payment-settings' || s === 'profile-basic-edit' || s === 'profile-professional' || s === 'profile-license' || s === 'profile-qualifications' || s === 'profile-experience' || s === 'profile-certificates') setActiveTab('more')
@@ -4386,7 +4602,7 @@ export default function App() {
       case 'location-add-choice': return <LocationAddChoiceScreen nav={nav} />
       case 'location-search': return <LocationSearchScreen nav={nav} />
       case 'location-info': return <LocationInfoScreen nav={nav} />
-      case 'weekly-schedule': return <WeeklyScheduleScreen nav={nav} />
+      case 'weekly-schedule': return <WeeklyScheduleScreen nav={nav} onboarding={onboardingMode} />
       case 'schedule-30day': return <Schedule30DayScreen nav={nav} />
       case 'day-editor': return <DayEditorScreen nav={nav} />
       case 'conflict-review': return <ConflictReviewScreen nav={nav} />
@@ -4419,7 +4635,7 @@ export default function App() {
         <div className="flex-1 flex flex-col overflow-hidden">
           {renderScreen()}
         </div>
-        {isAuth && <BottomNav active={activeTab} onTab={onTab} />}
+        {isAuth && !onboardingMode && <BottomNav active={activeTab} onTab={onTab} />}
       </div>
     </div>
   )
