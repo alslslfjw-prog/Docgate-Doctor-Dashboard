@@ -1,4 +1,4 @@
-// DocGate — Arabic RTL Mobile Healthcare Platform for Doctors
+﻿// DocGate — Arabic RTL Mobile Healthcare Platform for Doctors
 import { useState } from 'react'
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -20,7 +20,7 @@ type Screen =
   | 'schedule-setup' | 'onboarding-location' | 'schedule-done'
   | 'appointments'
 
-type NavTab = 'home' | 'appointments' | 'messages' | 'more'
+type NavTab = 'home' | 'bookings' | 'appointments' | 'messages' | 'more'
 
 type BookingStatus = 'pending' | 'confirmed' | 'checked-in' | 'in-progress' | 'completed' | 'cancelled' | 'no-show'
 
@@ -383,6 +383,7 @@ function BottomNav({ active, onTab }: { active: NavTab; onTab: (t: NavTab) => vo
     { id: 'more', label: 'المزيد', icon: c => <IcMenu c={c} /> },
     { id: 'messages', label: 'الرسائل', icon: c => <IcMessage c={c} /> },
     { id: 'appointments', label: 'المواعيد', icon: c => <IcCalendar c={c} /> },
+    { id: 'bookings', label: 'الحجوزات', icon: c => <IcClock c={c} /> },
     { id: 'home', label: 'الرئيسية', icon: c => <IcHome c={c} /> },
   ]
   return (
@@ -391,10 +392,10 @@ function BottomNav({ active, onTab }: { active: NavTab; onTab: (t: NavTab) => vo
         <button
           key={t.id}
           onClick={() => onTab(t.id)}
-          className="flex-1 flex flex-col items-center py-2.5 gap-1"
+          className="flex-1 flex flex-col items-center py-2 gap-0.5"
         >
           {t.icon(cn('w-5 h-5', active === t.id ? 'text-teal-primary' : 'text-[#B0C4C4]'))}
-          <span className={cn('text-[10px] font-semibold', active === t.id ? 'text-teal-primary' : 'text-[#B0C4C4]')}>
+          <span className={cn('text-[9px] font-semibold', active === t.id ? 'text-teal-primary' : 'text-[#B0C4C4]')}>
             {t.label}
           </span>
         </button>
@@ -2925,258 +2926,998 @@ function FinanceScreen({ nav }: { nav: (s: Screen) => void }) {
 
 // ── Appointments Screen (Central Hub) ─────────────────────────────────
 
-function AppointmentsScreen({ nav }: { nav: (s: Screen) => void }) {
+function AppointmentsScreen({ nav, onboarding = false }: { nav: (s: Screen) => void; onboarding?: boolean }) {
   const locations = [
-    { id: 'madina', name: 'مركز المدينة', color: 'teal' },
-    { id: 'burj', name: 'برج الأطباء', color: 'blue' },
-    { id: 'jumhuriya', name: 'مستشفى الجمهورية', color: 'indigo' },
-    { id: 'online', name: 'أونلاين', color: 'purple' },
-    { id: 'private', name: 'عيادتي الخاصة', color: 'emerald' },
+    { id: 'madina', name: 'مركز المدينة الطبي', dept: 'العيادة العامة', city: 'عدن – المنصورة' },
+    { id: 'burj', name: 'برج الأطباء', dept: 'العيادة الخاصة', city: 'عدن' },
+    { id: 'jumhuriya', name: 'مستشفى الجمهورية', dept: 'قسم الباطنية', city: 'عدن – خور مكسر' },
   ]
+
+  type Period = { label: string; from: string; to: string; dur: number; slots: number; special?: boolean; methods?: string[] }
+
   const [locId, setLocId] = useState('madina')
-  const [subTab, setSubTab] = useState<'bookings' | 'schedule' | 'policy'>('bookings')
-  const [schedTab, setSchedTab] = useState<'weekly' | '30day'>('weekly')
-  const [filter, setFilter] = useState('الكل')
-  const [policy, setPolicy] = useState<'instant' | 'center'>('center')
-  const [centerPolicy, setCenterPolicy] = useState<'anytime' | 'specific' | 'range'>('anytime')
+  const [schedTab, setSchedTab] = useState<'weekly' | 'monthly'>('weekly')
+  const [weekOffset, setWeekOffset] = useState(0)
+  const [monthOffset, setMonthOffset] = useState(0)
+  const [offDays, setOffDays] = useState(['الجمعة'])
 
-  const activeLoc = locations.find(l => l.id === locId)!
+  const [showLocSheet, setShowLocSheet] = useState(false)
+  const [showAddPeriod, setShowAddPeriod] = useState(false)
+  const [showAddSpecial, setShowAddSpecial] = useState(false)
+  const [showTemplates, setShowTemplates] = useState(false)
+  const [showHoliday, setShowHoliday] = useState(false)
+  const [showEmergency, setShowEmergency] = useState(false)
+  const [activePeriod, setActivePeriod] = useState<{ period: Period; dayName: string } | null>(null)
+  const [showEditPeriod, setShowEditPeriod] = useState(false)
+  const [isPreviewMode, setIsPreviewMode] = useState(false)
+  const [previewName, setPreviewName] = useState('')
+  const [selectedDate, setSelectedDate] = useState<number | null>(5)
 
-  const bookings = [
-    { time: '09:00 ص', name: 'محمد عبدالله', service: 'استشارة عامة', status: 'قيد الانتظار', statusV: 'warning', fee: '15,000 ر.ي' },
-    { time: '09:30 ص', name: 'أحمد علي', service: 'استشارة تخصصية', status: 'مؤكد', statusV: 'teal', fee: '25,000 ر.ي' },
-    { time: '10:30 ص', name: 'سارة محمد', service: 'متابعة', status: 'مؤكد', statusV: 'teal', fee: '10,000 ر.ي' },
-    { time: '11:15 ص', name: 'خالد سالم', service: 'استشارة عامة', status: 'قيد الانتظار', statusV: 'warning', fee: '15,000 ر.ي' },
-    { time: '02:00 م', name: 'نورة علي', service: 'استشارة عامة', status: 'مكتمل', statusV: 'success', fee: '15,000 ر.ي' },
+  const [apDays, setApDays] = useState<string[]>([])
+  const [apName, setApName] = useState('')
+  const [apFrom, setApFrom] = useState('08:00')
+  const [apTo, setApTo] = useState('13:00')
+  const [apDur, setApDur] = useState(15)
+  const [apRepeat, setApRepeat] = useState(true)
+  const [apRepeatType, setApRepeatType] = useState<'none' | 'until' | 'weeks'>('none')
+  const [apBooking, setApBooking] = useState(true)
+  const [apMethods, setApMethods] = useState<string[]>(['حجز موعد'])
+
+  const [epDays, setEpDays] = useState<string[]>([])
+  const [epName, setEpName] = useState('')
+  const [epFrom, setEpFrom] = useState('08:00')
+  const [epTo, setEpTo] = useState('13:00')
+  const [epDur, setEpDur] = useState(15)
+  const [epRepeat, setEpRepeat] = useState(true)
+  const [epRepeatType, setEpRepeatType] = useState<'none' | 'until' | 'weeks'>('none')
+  const [epBooking, setEpBooking] = useState(true)
+  const [epMethods, setEpMethods] = useState<string[]>(['حجز موعد'])
+
+  const [spDay, setSpDay] = useState('السبت')
+  const [spName, setSpName] = useState('')
+  const [spFrom, setSpFrom] = useState('10:00')
+  const [spTo, setSpTo] = useState('12:00')
+  const [spDur, setSpDur] = useState(20)
+  const [spBooking, setSpBooking] = useState(true)
+  const [spMethods, setSpMethods] = useState<string[]>(['حجز موعد'])
+
+  const [hlFrom, setHlFrom] = useState('')
+  const [hlTo, setHlTo] = useState('')
+  const [hlMode, setHlMode] = useState<'full' | 'period'>('full')
+  const [hlReason, setHlReason] = useState('')
+  const [emMode, setEmMode] = useState<'day' | 'period'>('day')
+
+  const weekDayNames = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة']
+
+  const fullSchedule: { name: string; periods: Period[] }[] = [
+    { name: 'السبت', periods: [
+      { label: 'صباحي', from: '08:00', to: '13:00', dur: 15, slots: 20, methods: ['حجز موعد'] },
+      { label: 'مسائي', from: '17:00', to: '21:00', dur: 15, slots: 16, methods: ['حجز موعد'] },
+    ]},
+    { name: 'الأحد', periods: [
+      { label: 'صباحي', from: '08:00', to: '13:00', dur: 15, slots: 20, methods: ['حجز موعد'] },
+      { label: 'مسائي', from: '17:00', to: '21:00', dur: 15, slots: 16, methods: ['حجز موعد'] },
+    ]},
+    { name: 'الاثنين', periods: [
+      { label: 'صباحي', from: '08:00', to: '13:00', dur: 15, slots: 20, methods: ['حجز موعد'] },
+      { label: 'مسائي', from: '17:00', to: '21:00', dur: 15, slots: 13, methods: ['حجز موعد'] },
+    ]},
+    { name: 'الثلاثاء', periods: [
+      { label: 'صباحي', from: '08:00', to: '13:00', dur: 15, slots: 20, methods: ['حجز موعد'] },
+      { label: 'خاص', from: '10:00', to: '12:00', dur: 20, slots: 8, special: true, methods: ['VIP'] },
+      { label: 'مسائي', from: '12:00', to: '13:00', dur: 15, slots: 4, methods: ['حجز موعد'] },
+    ]},
+    { name: 'الأربعاء', periods: [
+      { label: 'صباحي', from: '08:00', to: '13:00', dur: 15, slots: 20, methods: ['حجز موعد'] },
+    ]},
+    { name: 'الخميس', periods: [] },
+    { name: 'الجمعة', periods: [] },
   ]
-  const filters = ['الكل', 'قيد الانتظار', 'مؤكد', 'مكتمل']
-  const filtered = filter === 'الكل' ? bookings : bookings.filter(b => b.status === filter)
 
-  const weekDays = [
-    { name: 'السبت', off: false, sessions: [{ label: 'صباحي', start: '08:00 ص', end: '01:00 م', dur: 15, slots: 20 }] },
-    { name: 'الأحد', off: false, sessions: [{ label: 'صباحي', start: '08:00 ص', end: '12:00 م', dur: 15, slots: 16 }, { label: 'مسائي', start: '03:00 م', end: '06:00 م', dur: 30, slots: 6 }] },
-    { name: 'الاثنين', off: false, sessions: [{ label: 'صباحي', start: '09:00 ص', end: '02:00 م', dur: 15, slots: 20 }] },
-    { name: 'الثلاثاء', off: false, sessions: [{ label: 'صباحي', start: '08:00 ص', end: '01:00 م', dur: 15, slots: 20 }] },
-    { name: 'الأربعاء', off: false, sessions: [{ label: 'صباحي', start: '10:00 ص', end: '03:00 م', dur: 20, slots: 15 }] },
-    { name: 'الخميس', off: false, sessions: [{ label: 'صباحي', start: '08:00 ص', end: '01:00 م', dur: 15, slots: 20 }, { label: 'مسائي', start: '05:00 م', end: '08:00 م', dur: 30, slots: 6 }] },
-    { name: 'الجمعة', off: true, sessions: [] },
-  ]
+  const [weekDays, setWeekDays] = useState<{ name: string; periods: Period[] }[]>(
+    onboarding ? weekDayNames.map(n => ({ name: n, periods: [] })) : fullSchedule
+  )
 
-  return (
-    <div className="flex-1 flex flex-col bg-[#F0FAF9] overflow-hidden">
-      {/* Header */}
-      <div className="bg-teal-primary flex-shrink-0">
-        <StatusBar dark />
-        <div className="px-4 pt-2 pb-3">
-          <p className="text-white text-[17px] font-bold">المواعيد</p>
-        </div>
-        {/* Location tabs */}
-        <div className="flex gap-2 px-4 pb-3 overflow-x-auto">
-          {locations.map(loc => (
-            <button key={loc.id} onClick={() => setLocId(loc.id)}
-              className={cn('flex-shrink-0 px-3.5 py-1.5 rounded-full text-[12px] font-semibold transition-all',
-                locId === loc.id ? 'bg-white text-teal-primary' : 'bg-white/20 text-white/90')}>
-              {loc.name}
-            </button>
-          ))}
-        </div>
-      </div>
+  const templateData: { name: string; periods: Period[] }[] = weekDayNames.map((name, i) => ({
+    name,
+    periods: i < 5
+      ? [{ label: 'صباحي', from: '08:00', to: '13:00', dur: 15, slots: 20, methods: ['حجز موعد'] }]
+      : [],
+  }))
 
-      {/* Sub-tabs */}
-      <div className="bg-white border-b border-[#E8F0F0] flex-shrink-0">
-        <div className="flex">
-          {([['bookings', 'الحجوزات'], ['schedule', 'الجدول'], ['policy', 'سياسة الحجز']] as const).map(([id, label]) => (
-            <button key={id} onClick={() => setSubTab(id)}
-              className={cn('flex-1 py-3 text-[13px] font-semibold border-b-2 transition-colors',
-                subTab === id ? 'text-teal-primary border-teal-primary' : 'text-[#8A9E9E] border-transparent')}>
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
+  const displayDays = isPreviewMode ? templateData : weekDays
+  const activeLoc = locations.find(l => l.id === locId) || locations[0]
+  const workDaysCount = weekDays.filter(d => !offDays.includes(d.name) && d.periods.length > 0).length
+  const weekDates = weekDayNames.map((_, i) => 5 + i + weekOffset * 7)
 
-      <div className="flex-1 overflow-y-auto">
+  const monthNames = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
+  const currentMonth = ((8 + monthOffset) % 12 + 12) % 12
+  const currentYear = 2026 + Math.floor((8 + monthOffset) / 12)
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate()
+  const jsFirstDay = new Date(currentYear, currentMonth, 1).getDay()
+  const firstCol = (jsFirstDay + 1) % 7
 
-        {/* ── BOOKINGS sub-tab ── */}
-        {subTab === 'bookings' && (
-          <div className="flex flex-col">
-            {/* Date strip */}
-            <div className="bg-white px-4 pt-3 pb-2 border-b border-[#E8F0F0]">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-[12px] text-teal-primary font-semibold">الأحد، 8 سبتمبر 2026</p>
-                <div className="flex items-center gap-3">
-                  <span className="text-[11px] text-[#8A9E9E]">{bookings.length} حجوزات</span>
-                </div>
-              </div>
-              <div className="flex gap-1.5 overflow-x-auto">
-                {filters.map(f => (
-                  <button key={f} onClick={() => setFilter(f)}
-                    className={cn('flex-shrink-0 px-3 py-1 rounded-full text-[11px] font-semibold border transition-all',
-                      filter === f ? 'bg-teal-primary text-white border-teal-primary' : 'bg-white text-[#8A9E9E] border-[#E0EDED]')}>
-                    {f}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="px-4 pt-3 flex flex-col gap-2 pb-4">
-              {filtered.map((b, i) => (
-                <button key={i} onClick={() => nav('booking-details')}
-                  className="bg-white rounded-2xl p-4 border border-[#E8F0F0] shadow-sm flex items-center justify-between w-full">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center flex-shrink-0">
-                      <IcUser c="w-5 h-5 text-teal-primary" />
-                    </div>
-                    <div className="min-w-0 text-right">
-                      <p className="text-[13px] font-bold text-[#1A2424]">{b.name}</p>
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <IcClock c="w-3 h-3 text-[#8A9E9E]" />
-                        <span className="text-[11px] text-[#8A9E9E]">{b.time}</span>
-                        <span className="text-[11px] text-[#B0C4C4]">·</span>
-                        <span className="text-[11px] text-[#8A9E9E]">{b.service}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <Badge label={b.status} variant={b.statusV as 'teal' | 'warning' | 'success'} />
-                    <IcChevronLeft c="w-4 h-4 text-[#B0C4C4]" />
-                  </div>
-                </button>
-              ))}
-            </div>
+  const calcSlots = (from: string, to: string, dur: number) => {
+    try {
+      const [fh, fm] = from.split(':').map(Number)
+      const [th, tm] = to.split(':').map(Number)
+      return Math.max(0, Math.floor(((th * 60 + tm) - (fh * 60 + fm)) / dur))
+    } catch { return 0 }
+  }
+
+  const getDayDots = (dayNum: number): ('work' | 'special')[] => {
+    if (dayNum < 1 || dayNum > daysInMonth) return []
+    const dow = (firstCol + dayNum - 1) % 7
+    if (dow === 6) return []
+    const dots: ('work' | 'special')[] = []
+    if (dow < 5) dots.push('work')
+    if (dayNum === 8) dots.push('special')
+    return dots
+  }
+
+  const toggleOffDay = (day: string) =>
+    setOffDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])
+
+  const togMethod = (methods: string[], setter: (v: string[]) => void, m: string) =>
+    setter(methods.includes(m) ? methods.filter(x => x !== m) : [...methods, m])
+
+  const addPeriod = () => {
+    if (!apName || apDays.length === 0) return
+    setWeekDays(prev => prev.map(d =>
+      apDays.includes(d.name)
+        ? { ...d, periods: [...d.periods, { label: apName, from: apFrom, to: apTo, dur: apDur, slots: calcSlots(apFrom, apTo, apDur), methods: [...apMethods] }] }
+        : d
+    ))
+    setApDays([]); setApName(''); setShowAddPeriod(false)
+  }
+
+  const addSpecialPeriod = () => {
+    if (!spName) return
+    setWeekDays(prev => prev.map(d =>
+      d.name === spDay
+        ? { ...d, periods: [...d.periods, { label: spName, from: spFrom, to: spTo, dur: spDur, slots: calcSlots(spFrom, spTo, spDur), special: true, methods: [...spMethods] }] }
+        : d
+    ))
+    setSpName(''); setShowAddSpecial(false)
+  }
+
+  const deletePeriod = (dayName: string, periodLabel: string) => {
+    setWeekDays(prev => prev.map(d =>
+      d.name === dayName ? { ...d, periods: d.periods.filter(p => p.label !== periodLabel) } : d
+    ))
+    setActivePeriod(null)
+  }
+
+  const openEdit = (period: Period, dayName: string) => {
+    setEpName(period.label); setEpFrom(period.from); setEpTo(period.to)
+    setEpDur(period.dur); setEpMethods(period.methods || ['حجز موعد']); setEpDays([dayName])
+    setShowEditPeriod(true)
+  }
+
+  const saveEdit = () => {
+    if (!activePeriod) return
+    setWeekDays(prev => prev.map(d =>
+      d.name === activePeriod.dayName
+        ? { ...d, periods: d.periods.map(p =>
+            p.label === activePeriod.period.label
+              ? { ...p, label: epName, from: epFrom, to: epTo, dur: epDur, slots: calcSlots(epFrom, epTo, epDur), methods: [...epMethods] }
+              : p
+          )}
+        : d
+    ))
+    setShowEditPeriod(false); setActivePeriod(null)
+  }
+
+  // ── Inner UI helpers (no hooks, safe inside component) ──
+
+  const Sheet = ({ title, subtitle, onClose, children }: { title: string; subtitle?: string; onClose: () => void; children: React.ReactNode }) => (
+    <div className="absolute inset-0 bg-black/40 z-50 flex flex-col justify-end">
+      <div className="bg-white rounded-t-3xl max-h-[92%] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#F0F4F4] flex-shrink-0">
+          <button onClick={onClose} className="text-[13px] text-[#8A9E9E] font-semibold">إغلاق</button>
+          <div className="flex-1 text-center">
+            <p className="text-[15px] font-bold text-[#1A2424]">{title}</p>
+            {subtitle && <p className="text-[11px] text-[#8A9E9E] mt-0.5">{subtitle}</p>}
           </div>
-        )}
-
-        {/* ── SCHEDULE sub-tab ── */}
-        {subTab === 'schedule' && (
-          <div className="flex flex-col">
-            {/* Weekly / 30day toggle */}
-            <div className="bg-white border-b border-[#E8F0F0] px-4 py-2.5">
-              <div className="flex bg-[#F0F4F4] rounded-xl p-1">
-                <button onClick={() => setSchedTab('weekly')}
-                  className={cn('flex-1 py-2 rounded-lg text-[12px] font-bold transition-all',
-                    schedTab === 'weekly' ? 'bg-white text-teal-primary shadow-sm' : 'text-[#8A9E9E]')}>
-                  الجدول الأسبوعي
-                </button>
-                <button onClick={() => nav('schedule-30day')}
-                  className="flex-1 py-2 rounded-lg text-[12px] font-bold text-[#8A9E9E]">
-                  الأيام الـ30 القادمة
-                </button>
-              </div>
-            </div>
-
-            {/* Weekly off chips */}
-            <div className="px-4 pt-3 pb-2">
-              <p className="text-[11px] font-bold text-[#8A9E9E] mb-2 text-right">الإجازة الأسبوعية</p>
-              <div className="flex gap-1.5 flex-wrap">
-                {weekDays.map(d => (
-                  <span key={d.name}
-                    className={cn('px-3 py-1 rounded-full text-[11px] font-semibold border',
-                      d.off ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-[#F0F4F4] text-[#8A9E9E] border-transparent')}>
-                    {d.name}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Day cards */}
-            <div className="px-4 pb-4 flex flex-col gap-2">
-              {weekDays.map((d, i) => (
-                <div key={i} className={cn('rounded-2xl border shadow-sm overflow-hidden', d.off ? 'bg-[#FAFBFB] border-[#E8F0F0]' : 'bg-white border-[#E8F0F0]')}>
-                  {/* Day header */}
-                  <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#F0F4F4]">
-                    <div className="flex items-center gap-1.5">
-                      {d.off ? (
-                        <span className="text-[11px] bg-amber-100 text-amber-700 font-semibold px-2 py-0.5 rounded-full">إجازة</span>
-                      ) : (
-                        <span className="text-[11px] bg-teal-50 text-teal-primary font-semibold px-2 py-0.5 rounded-full">يعمل</span>
-                      )}
-                    </div>
-                    <p className="text-[14px] font-bold text-[#1A2424]">{d.name}</p>
-                  </div>
-                  {/* Sessions */}
-                  {!d.off && (
-                    <div className="px-4 py-2 flex flex-col gap-1.5">
-                      {d.sessions.map((s, j) => (
-                        <button key={j} onClick={() => nav('session-editor')}
-                          className="w-full bg-teal-50/60 rounded-xl px-3 py-2.5 flex items-center justify-between">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] text-teal-primary font-bold bg-white rounded-full px-2 py-0.5 border border-teal-100">{s.slots} موعد</span>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-[12px] font-bold text-[#1A2424]">{s.label} · {s.start} – {s.end}</p>
-                            <p className="text-[10px] text-[#8A9E9E] mt-0.5">{s.dur} دقيقة/موعد</p>
-                          </div>
-                        </button>
-                      ))}
-                      <button onClick={() => nav('session-editor')}
-                        className="w-full py-2 text-teal-primary text-[12px] font-semibold border border-dashed border-teal-200 rounded-xl">
-                        + إضافة فترة
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-            <div className="px-4 pb-5">
-              <Btn onClick={() => nav('schedule-30day')}>
-                <IcCalendar c="w-4 h-4" />
-                عرض الأيام الـ30 القادمة
-              </Btn>
-            </div>
-          </div>
-        )}
-
-        {/* ── POLICY sub-tab ── */}
-        {subTab === 'policy' && (
-          <div className="px-4 pt-4 pb-6 flex flex-col gap-4">
-            <div className="bg-teal-50 rounded-2xl p-3.5 border border-teal-100">
-              <p className="text-[12px] text-teal-primary text-right leading-relaxed">سياسة التأكيد تنطبق على <span className="font-bold">{activeLoc.name}</span> فقط.</p>
-            </div>
-            <div className="bg-white rounded-2xl border border-[#E8F0F0] shadow-sm">
-              <button onClick={() => setPolicy('instant')} className="flex items-center justify-between px-4 py-4 w-full border-b border-[#F0F4F4]">
-                <div className={cn('w-5 h-5 rounded-full border-2 flex items-center justify-center', policy === 'instant' ? 'border-teal-primary' : 'border-[#C0D4D4]')}>
-                  {policy === 'instant' && <div className="w-2.5 h-2.5 rounded-full bg-teal-primary" />}
-                </div>
-                <div className="text-right">
-                  <p className="text-[14px] font-bold text-[#1A2424]">تأكيد فوري</p>
-                  <p className="text-[12px] text-[#8A9E9E] mt-0.5">تُقبل الحجوزات تلقائيًا فور إرسالها</p>
-                </div>
-              </button>
-              <button onClick={() => setPolicy('center')} className="flex items-center justify-between px-4 py-4 w-full">
-                <div className={cn('w-5 h-5 rounded-full border-2 flex items-center justify-center', policy === 'center' ? 'border-teal-primary' : 'border-[#C0D4D4]')}>
-                  {policy === 'center' && <div className="w-2.5 h-2.5 rounded-full bg-teal-primary" />}
-                </div>
-                <div className="text-right">
-                  <p className="text-[14px] font-bold text-[#1A2424]">تأكيد في المركز</p>
-                  <p className="text-[12px] text-[#8A9E9E] mt-0.5">يقوم المركز بمراجعة الحجز وتأكيده</p>
-                </div>
-              </button>
-            </div>
-            {policy === 'center' && (
-              <div className="bg-white rounded-2xl border border-[#E8F0F0] shadow-sm p-4 flex flex-col gap-3">
-                <p className="text-[13px] font-bold text-[#1A2424] text-right">وقت التأكيد</p>
-                {([['anytime', 'في أي وقت قبل الموعد', 'يمكن التأكيد في أي وقت'], ['specific', 'في وقت محدد', '09:00 ص'], ['range', 'خلال فترة زمنية', 'من 08:00 ص إلى 10:00 ص']] as const).map(([id, label, sub]) => (
-                  <button key={id} onClick={() => setCenterPolicy(id)} className="flex items-center justify-between w-full py-2.5 border-b border-[#F8FAFA] last:border-0">
-                    <div className={cn('w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0', centerPolicy === id ? 'border-teal-primary' : 'border-[#C0D4D4]')}>
-                      {centerPolicy === id && <div className="w-2 h-2 rounded-full bg-teal-primary" />}
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[13px] font-semibold text-[#1A2424]">{label}</p>
-                      <p className="text-[11px] text-[#8A9E9E]">{sub}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-            <Btn>حفظ السياسة</Btn>
-          </div>
-        )}
+          <div className="w-10" />
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
       </div>
     </div>
   )
-}
 
-// ── Patients Screen ────────────────────────────────────────────────────
+  const Tog = ({ on, setOn }: { on: boolean; setOn: (v: boolean) => void }) => (
+    <button onClick={() => setOn(!on)}
+      className={cn('w-12 h-6 rounded-full flex items-center transition-colors flex-shrink-0 px-0.5', on ? 'bg-teal-primary justify-end' : 'bg-[#D0D8D8] justify-start')}>
+      <div className="w-5 h-5 rounded-full bg-white shadow-sm" />
+    </button>
+  )
+
+  const MethodCards = ({ methods, setMethods }: { methods: string[]; setMethods: (v: string[]) => void }) => (
+    <div className="flex gap-2">
+      {([['حجز موعد', '📅'], ['حجز فوري', '⚡'], ['VIP', '⭐']] as const).map(([label, icon]) => (
+        <button key={label} onClick={() => togMethod(methods, setMethods, label)}
+          className={cn('flex-1 flex flex-col items-center py-3 px-1 rounded-2xl border gap-1.5 transition-all',
+            methods.includes(label) ? 'bg-teal-50 border-teal-primary' : 'bg-[#F8FAFA] border-[#E0EDED]')}>
+          <span className="text-[18px]">{icon}</span>
+          <span className={cn('text-[10px] font-bold text-center leading-tight', methods.includes(label) ? 'text-teal-primary' : 'text-[#8A9E9E]')}>{label}</span>
+        </button>
+      ))}
+    </div>
+  )
+
+  const SummaryCard = ({ days, name, from, to, dur, methods }: { days?: string[]; name: string; from: string; to: string; dur: number; methods: string[] }) => (
+    <div className="bg-[#1A2828] rounded-2xl p-4">
+      <p className="text-[10px] text-white/40 mb-2 text-right">ملخص الفترة</p>
+      <div className="flex flex-wrap gap-x-4 gap-y-2">
+        {days && days.length > 0 && <div><p className="text-[9px] text-white/40 text-right">أيام الفترة</p><p className="text-[12px] font-bold text-white text-right">{days.join(' · ')}</p></div>}
+        <div><p className="text-[9px] text-white/40 text-right">الوقت</p><p className="text-[12px] font-bold text-white text-right">{from}–{to}</p></div>
+        <div><p className="text-[9px] text-white/40 text-right">مدة الموعد</p><p className="text-[12px] font-bold text-white text-right">{dur} دقيقة</p></div>
+        <div><p className="text-[9px] text-white/40 text-right">المواعيد</p><p className="text-[12px] font-bold text-white text-right">{calcSlots(from, to, dur)} موعداً</p></div>
+        {methods.length > 0 && <div><p className="text-[9px] text-white/40 text-right">طرق الحجز</p><p className="text-[12px] font-bold text-white text-right">{methods.join(' · ')}</p></div>}
+      </div>
+    </div>
+  )
+
+  const DayPicker = ({ selected, setSelected, multi = true }: { selected: string[]; setSelected: (v: string[]) => void; multi?: boolean }) => (
+    <div className="flex flex-wrap gap-1.5">
+      {weekDayNames.map(d => {
+        const isHol = offDays.includes(d)
+        const isSel = selected.includes(d)
+        return (
+          <button key={d} onClick={() => {
+            if (isHol) return
+            if (multi) setSelected(isSel ? selected.filter(x => x !== d) : [...selected, d])
+            else setSelected([d])
+          }} className={cn('px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-all',
+            isSel ? 'bg-teal-primary text-white border-teal-primary'
+            : isHol ? 'bg-amber-50 text-amber-400 border-amber-200 opacity-70'
+            : 'bg-[#F0F4F4] text-[#8A9E9E] border-transparent')}>
+            {d}{isHol ? ' ·إجازة' : ''}
+          </button>
+        )
+      })}
+    </div>
+  )
+
+  const RepeatBlock = ({ repeat, setRepeat, rType, setRType }: { repeat: boolean; setRepeat: (v: boolean) => void; rType: 'none'|'until'|'weeks'; setRType: (v: 'none'|'until'|'weeks') => void }) => (
+    <div className="bg-[#F8FAFA] rounded-2xl p-4 flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <Tog on={repeat} setOn={setRepeat} />
+        <p className="text-[13px] font-bold text-[#1A2424]">تكرار أسبوعياً</p>
+      </div>
+      {repeat && (
+        <div className="flex flex-col gap-1.5">
+          {([['none', 'بدون تاريخ انتهاء'], ['until', 'حتى تاريخ محدد'], ['weeks', 'عدد محدد من الأسابيع']] as const).map(([id, lbl]) => (
+            <button key={id} onClick={() => setRType(id)}
+              className={cn('flex items-center gap-3 px-3 py-2.5 rounded-xl border text-right',
+                rType === id ? 'bg-teal-50 border-teal-200' : 'bg-white border-[#E0EDED]')}>
+              <div className={cn('w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center',
+                rType === id ? 'border-teal-primary' : 'border-[#C0D4D4]')}>
+                {rType === id && <div className="w-2 h-2 rounded-full bg-teal-primary" />}
+              </div>
+              <span className="text-[12px] font-semibold text-[#1A2424]">{lbl}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
+  const DetailsBlock = ({ name, setName, from, setFrom, to, setTo, dur, setDur, accent = 'teal' }: {
+    name: string; setName: (v: string) => void; from: string; setFrom: (v: string) => void
+    to: string; setTo: (v: string) => void; dur: number; setDur: (v: number) => void; accent?: string
+  }) => (
+    <div className="bg-[#F8FAFA] rounded-2xl p-4 flex flex-col gap-3">
+      <p className="text-[13px] font-bold text-[#1A2424] text-right">تفاصيل الفترة</p>
+      <div>
+        <label className="text-[12px] font-semibold text-[#374040] block mb-1 text-right">اسم الفترة</label>
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="مثال: صباحي، مسائي"
+          className="w-full bg-white border border-[#E0EDED] rounded-xl px-4 py-2.5 text-[13px] text-[#1A2424] focus:outline-none focus:border-teal-primary text-right" />
+      </div>
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <label className="text-[12px] font-semibold text-[#374040] block mb-1 text-right">من</label>
+          <input type="time" value={from} onChange={e => setFrom(e.target.value)}
+            className="w-full bg-white border border-[#E0EDED] rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:border-teal-primary" />
+        </div>
+        <div className="flex-1">
+          <label className="text-[12px] font-semibold text-[#374040] block mb-1 text-right">إلى</label>
+          <input type="time" value={to} onChange={e => setTo(e.target.value)}
+            className="w-full bg-white border border-[#E0EDED] rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:border-teal-primary" />
+        </div>
+      </div>
+      <div>
+        <label className="text-[12px] font-semibold text-[#374040] block mb-1.5 text-right">مدة الموعد</label>
+        <div className="flex gap-1.5 flex-wrap">
+          {[15, 20, 30, 45, 60].map(d => (
+            <button key={d} onClick={() => setDur(d)}
+              className={cn('px-3 py-1.5 rounded-xl text-[11px] font-semibold border transition-all',
+                dur === d ? 'bg-teal-primary text-white border-teal-primary' : 'bg-white text-[#8A9E9E] border-[#E0EDED]')}>
+              {d} د
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+
+  // ── Main render ──
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden relative bg-[#EEF3F3]">
+      <StatusBar />
+      <div className="flex-1 overflow-y-auto">
+
+        {/* Onboarding back button */}
+        {onboarding && (
+          <button onClick={() => nav('onboarding-location')} className="flex items-center gap-1 px-4 pt-3 pb-1 text-[#374040]">
+            <IcChevronRight c="w-5 h-5" />
+            <span className="text-[13px] font-semibold">الرجوع</span>
+          </button>
+        )}
+
+        {/* ── HEADER CARD ── */}
+        <div className={cn('mx-4 bg-white rounded-3xl border border-[#E4EEEE] shadow-sm p-5', onboarding ? 'mt-0' : 'mt-4')}>
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-[13px] font-bold text-[#374040] bg-[#F0F9F9] px-2.5 py-1 rounded-xl">د.ع</span>
+            <div className="flex items-center gap-2.5">
+              <div className="text-right">
+                <p className="text-[14px] font-bold text-[#1A2424]">DocGate</p>
+                <p className="text-[10px] text-[#8A9E9E]">بوابة الرعاية المتصلة</p>
+              </div>
+              <div className="w-10 h-10 rounded-2xl bg-teal-primary flex items-center justify-center flex-shrink-0">
+                <IcPlus c="w-5 h-5 text-white" />
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-1.5 mb-1">
+            <span className="text-[11px] text-[#8A9E9E] font-medium">موقع العمل</span>
+            <IcCalendar c="w-3.5 h-3.5 text-[#8A9E9E]" />
+          </div>
+          <h1 className="text-[26px] font-bold text-[#1A2424] text-right leading-tight mb-1">الجدول والمواعيد</h1>
+          <p className="text-[13px] text-[#8A9E9E] text-right">
+            {onboarding ? 'مركز المدينة الطبي' : activeLoc.name} · {onboarding ? 'العيادة العامة' : activeLoc.dept}
+          </p>
+          <div className="flex items-center justify-between mt-3">
+            {!onboarding && (
+              <button onClick={() => setShowLocSheet(true)} className="text-[11px] text-teal-primary font-semibold underline">تغيير الموقع</button>
+            )}
+            <button onClick={() => !onboarding && setShowLocSheet(true)}
+              className="flex items-center gap-1.5 bg-teal-50 border border-teal-100 rounded-xl px-3 py-1.5">
+              <span className="text-[11px] font-bold text-teal-primary">مفعّل</span>
+              <span className="text-[11px] text-teal-primary">✓</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ── WEEK NAV ── */}
+        <div className="mx-4 mt-3 bg-white rounded-2xl border border-[#E4EEEE] shadow-sm px-4 py-3 flex items-center justify-between">
+          <button onClick={() => setWeekOffset(w => w + 1)} className="w-9 h-9 rounded-xl bg-[#F0F4F4] flex items-center justify-center">
+            <IcChevronLeft c="w-4 h-4 text-[#374040]" />
+          </button>
+          <div className="text-center">
+            <p className="text-[11px] text-[#8A9E9E] mb-0.5">
+              {weekOffset === 0 ? 'الأسبوع الحالي' : weekOffset > 0 ? `بعد ${weekOffset} أسبوع` : `قبل ${-weekOffset} أسبوع`}
+            </p>
+            <p className="text-[14px] font-bold text-[#1A2424]">{weekDates[0]} سبتمبر – {weekDates[6]} سبتمبر ٢٠٢٦</p>
+          </div>
+          <button onClick={() => setWeekOffset(w => w - 1)} className="w-9 h-9 rounded-xl bg-[#F0F4F4] flex items-center justify-center">
+            <IcChevronRight c="w-4 h-4 text-[#374040]" />
+          </button>
+        </div>
+
+        {/* ── SEGMENTED CONTROL ── */}
+        <div className="mx-4 mt-3 bg-white rounded-2xl border border-[#E4EEEE] shadow-sm p-1.5 flex gap-1">
+          <button onClick={() => setSchedTab('monthly')}
+            className={cn('flex-1 py-2.5 rounded-xl text-[13px] font-bold flex items-center justify-center gap-2 transition-all',
+              schedTab === 'monthly' ? 'bg-white shadow border border-[#E4EEEE] text-[#1A2424]' : 'text-[#8A9E9E]')}>
+            <IcCalendar c="w-4 h-4" /> شهري
+          </button>
+          <button onClick={() => setSchedTab('weekly')}
+            className={cn('flex-1 py-2.5 rounded-xl text-[13px] font-bold flex items-center justify-center gap-2 transition-all',
+              schedTab === 'weekly' ? 'bg-white shadow border border-[#E4EEEE] text-[#1A2424]' : 'text-[#8A9E9E]')}>
+            <IcSettings c="w-4 h-4" /> أسبوعي
+          </button>
+        </div>
+
+        {/* ══════════════════════════════
+            WEEKLY VIEW
+        ══════════════════════════════ */}
+        {schedTab === 'weekly' && (
+          <div className="px-4 pt-4 pb-10 flex flex-col gap-5">
+
+            {/* Preview Banner */}
+            {isPreviewMode && (
+              <div className="bg-purple-50 border border-purple-200 rounded-2xl p-3.5 flex items-center justify-between gap-3">
+                <button onClick={() => { setIsPreviewMode(false); setPreviewName('') }}
+                  className="text-[11px] text-purple-400 font-bold border border-purple-200 rounded-xl px-3 py-1.5 flex-shrink-0">إلغاء</button>
+                <div className="text-right">
+                  <p className="text-[13px] font-bold text-purple-700">معاينة: {previewName}</p>
+                  <p className="text-[11px] text-purple-500 mt-0.5">لم يتم التطبيق بعد</p>
+                </div>
+              </div>
+            )}
+
+            {/* Onboarding empty hint */}
+            {onboarding && weekDays.every(d => d.periods.length === 0) && (
+              <div className="bg-teal-50 border border-teal-100 rounded-2xl p-5 text-center">
+                <p className="text-[14px] font-bold text-teal-primary mb-1">لم تضف فترات عمل لهذا الأسبوع بعد</p>
+                <p className="text-[12px] text-teal-600 mb-3">أضف فترة عمل معتادة لتبدأ جدولك الأسبوعي</p>
+                <button onClick={() => setShowAddPeriod(true)} className="px-5 py-2.5 bg-teal-primary text-white text-[13px] font-bold rounded-xl">
+                  إضافة فترة معتادة
+                </button>
+              </div>
+            )}
+
+            {/* الإجازة الأسبوعية */}
+            <div>
+              <div className="flex items-center justify-between mb-2.5">
+                <span className="text-[11px] text-[#8A9E9E]">ضبط متكرر</span>
+                <p className="text-[15px] font-bold text-[#1A2424]">الإجازة الأسبوعية</p>
+              </div>
+              <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+                {weekDayNames.map(d => (
+                  <button key={d} onClick={() => toggleOffDay(d)}
+                    className={cn('flex-shrink-0 px-3.5 py-2 rounded-full text-[12px] font-semibold border transition-all',
+                      offDays.includes(d)
+                        ? 'bg-[#F0F4F4] text-[#374040] border-[#D0D8D8]'
+                        : 'bg-white text-[#8A9E9E] border-[#E4EEEE]')}>
+                    {d}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* جدول هذا الأسبوع */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-1.5 text-[#8A9E9E]">
+                  <IcClock c="w-3.5 h-3.5" />
+                  <span className="text-[11px]">{workDaysCount} أيام عمل</span>
+                </div>
+                <p className="text-[15px] font-bold text-[#1A2424]">
+                  {isPreviewMode ? `جدول هذا الأسبوع (${previewName})` : 'جدول هذا الأسبوع'}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {displayDays.map((d, i) => {
+                  const isOff = offDays.includes(d.name)
+                  return (
+                    <div key={d.name} className={cn('rounded-2xl border shadow-sm', isOff ? 'bg-[#F8FAFA] border-[#E8EDED]' : 'bg-white border-[#E4EEEE]')}>
+                      <div className="px-3 pt-3 pb-2.5 flex items-start justify-between border-b border-[#F2F6F6]">
+                        <div className={cn('w-2 h-2 rounded-full mt-1 flex-shrink-0',
+                          isOff ? 'bg-[#D0DCDC]' : d.periods.length > 0 ? 'bg-teal-primary' : 'bg-[#D0DCDC]')} />
+                        <div className="text-right">
+                          <p className={cn('text-[13px] font-bold', isOff ? 'text-[#A0B4B4]' : 'text-[#1A2424]')}>{d.name}</p>
+                          <p className="text-[10px] text-[#8A9E9E]">{weekDates[i]} سبتمبر</p>
+                        </div>
+                      </div>
+                      <div className="px-3 py-2.5 flex flex-col gap-2">
+                        {isOff ? (
+                          <div className="flex justify-end">
+                            <span className="text-[10px] bg-[#F0F4F4] text-[#8A9E9E] font-semibold px-2 py-0.5 rounded-full">إجازة</span>
+                          </div>
+                        ) : d.periods.length === 0 ? (
+                          <p className="text-[10px] text-[#B0C4C4] text-center py-2">لا توجد فترات</p>
+                        ) : (
+                          d.periods.map((p, j) => (
+                            <button key={j} onClick={() => setActivePeriod({ period: p, dayName: d.name })}
+                              className={cn('w-full text-right rounded-xl px-2.5 py-2 transition-all',
+                                p.special ? 'bg-purple-50 border border-purple-100' : 'bg-[#F0FAF9] border border-teal-100/50')}>
+                              <div className="flex items-start justify-between gap-1">
+                                <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 mt-0.5',
+                                  p.special ? 'bg-purple-100 text-purple-600' : 'bg-white text-teal-primary border border-teal-100')}>
+                                  {p.slots}
+                                </span>
+                                <div>
+                                  <p className={cn('text-[11px] font-bold leading-tight', p.special ? 'text-purple-700' : 'text-[#1A2424]')}>{p.label}</p>
+                                  <p className={cn('text-[10px]', p.special ? 'text-purple-500' : 'text-teal-600')}>{p.from}–{p.to}</p>
+                                  <p className="text-[9px] text-[#8A9E9E]">كل {p.dur} دق.</p>
+                                </div>
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Preview apply actions */}
+            {isPreviewMode && (
+              <div className="bg-white border border-purple-100 rounded-2xl p-4 flex flex-col gap-2">
+                <Btn onClick={() => { setWeekDays([...templateData]); setIsPreviewMode(false); setPreviewName('') }}>تطبيق هذا الأسبوع</Btn>
+                <Btn variant="secondary" onClick={() => { setWeekDays([...templateData]); setIsPreviewMode(false); setPreviewName('') }}>تطبيق وتكرار</Btn>
+                <button onClick={() => { setIsPreviewMode(false); setPreviewName('') }}
+                  className="py-2.5 text-[13px] text-[#8A9E9E] font-semibold text-center">إلغاء المعاينة</button>
+              </div>
+            )}
+
+            {/* إدارة الجدول */}
+            {!isPreviewMode && (
+              <div>
+                <p className="text-[15px] font-bold text-[#1A2424] text-right mb-3">إدارة الجدول</p>
+                <div className="flex flex-col gap-2">
+                  <button onClick={() => setShowAddPeriod(true)}
+                    className="bg-white rounded-2xl border border-[#E4EEEE] shadow-sm px-4 py-3.5 flex items-center gap-3">
+                    <div className="flex-1 text-right">
+                      <p className="text-[13px] font-bold text-[#1A2424]">إضافة فترة معتادة</p>
+                      <p className="text-[11px] text-[#8A9E9E]">تطبق على يوم أو أكثر من 00:00</p>
+                    </div>
+                    <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center flex-shrink-0">
+                      <IcPlus c="w-5 h-5 text-teal-primary" />
+                    </div>
+                    <IcChevronLeft c="w-4 h-4 text-[#B0C4C4] flex-shrink-0" />
+                  </button>
+
+                  <button onClick={() => setShowAddSpecial(true)}
+                    className="bg-white rounded-2xl border border-purple-100 shadow-sm px-4 py-3.5 flex items-center gap-3">
+                    <div className="flex-1 text-right">
+                      <p className="text-[13px] font-bold text-[#1A2424]">إضافة فترة خاصة</p>
+                      <p className="text-[11px] text-[#8A9E9E]">أولوية أعلى من الجدول العادي</p>
+                    </div>
+                    <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center flex-shrink-0">
+                      <IcStar c="w-5 h-5 text-purple-500" />
+                    </div>
+                    <IcChevronLeft c="w-4 h-4 text-[#B0C4C4] flex-shrink-0" />
+                  </button>
+
+                  {!onboarding && (
+                    <>
+                      <button onClick={() => setShowTemplates(true)}
+                        className="bg-white rounded-2xl border border-[#E4EEEE] shadow-sm px-4 py-3.5 flex items-center gap-3">
+                        <div className="flex-1 text-right">
+                          <p className="text-[13px] font-bold text-[#1A2424]">النماذج المحفوظة</p>
+                          <p className="text-[11px] text-[#8A9E9E]">2 نماذج جاهزة للاستخدام</p>
+                        </div>
+                        <div className="w-10 h-10 rounded-xl bg-[#F0F4F4] flex items-center justify-center flex-shrink-0">
+                          <IcSettings c="w-5 h-5 text-[#374040]" />
+                        </div>
+                        <IcChevronLeft c="w-4 h-4 text-[#B0C4C4] flex-shrink-0" />
+                      </button>
+
+                      <button onClick={() => setShowHoliday(true)}
+                        className="bg-white rounded-2xl border border-[#E4EEEE] shadow-sm px-4 py-3.5 flex items-center gap-3">
+                        <div className="flex-1 text-right">
+                          <p className="text-[13px] font-bold text-[#1A2424]">الإجازات المجدولة</p>
+                          <p className="text-[11px] text-[#8A9E9E]">تخطيط للإجازات المستقبلية</p>
+                        </div>
+                        <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
+                          <IcCalendar c="w-5 h-5 text-amber-500" />
+                        </div>
+                        <IcChevronLeft c="w-4 h-4 text-[#B0C4C4] flex-shrink-0" />
+                      </button>
+
+                      <button onClick={() => setShowEmergency(true)}
+                        className="bg-white rounded-2xl border border-red-100 shadow-sm px-4 py-3.5 flex items-center gap-3">
+                        <div className="flex-1 text-right">
+                          <p className="text-[13px] font-bold text-[#1A2424]">إجازة طارئة</p>
+                          <p className="text-[11px] text-[#8A9E9E]">إغلاق فوري ليوم أو فترة من الأسبوع</p>
+                        </div>
+                        <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0">
+                          <IcBell c="w-5 h-5 text-red-500" />
+                        </div>
+                        <IcChevronLeft c="w-4 h-4 text-[#B0C4C4] flex-shrink-0" />
+                      </button>
+
+                      <button className="w-full mt-1 py-3 text-[13px] font-semibold text-red-400 border border-dashed border-red-200 rounded-2xl">
+                        حذف جدول الأسبوع 🗑️
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {onboarding && (
+              <Btn onClick={() => nav('schedule-done')}>حفظ الجدول والمتابعة</Btn>
+            )}
+
+            <div className="flex items-center justify-center gap-2 pt-2">
+              <span className="text-[10px] text-[#8A9E9E]">جميع تحديثات الجدول تُعرض مباشرة للطبيب</span>
+              <span>💚</span>
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════
+            MONTHLY VIEW
+        ══════════════════════════════ */}
+        {schedTab === 'monthly' && (
+          <div className="px-4 pt-4 pb-10 flex flex-col gap-4">
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {[['bg-teal-primary', 'دوام'], ['bg-purple-500', 'خاص'], ['bg-red-400', 'إجازة']].map(([cls, lbl]) => (
+                  <div key={lbl} className="flex items-center gap-1">
+                    <div className={cn('w-2 h-2 rounded-full flex-shrink-0', cls)} />
+                    <span className="text-[10px] text-[#8A9E9E] font-medium">{lbl}</span>
+                  </div>
+                ))}
+              </div>
+              <span className="text-[11px] text-[#8A9E9E]">للمراجعة والتنقل</span>
+            </div>
+
+            <p className="text-[22px] font-bold text-[#1A2424] text-right">{monthNames[currentMonth]} {currentYear}</p>
+
+            <div className="bg-white rounded-2xl border border-[#E4EEEE] shadow-sm p-4">
+              <div className="flex items-center justify-between mb-4">
+                <button onClick={() => setMonthOffset(o => o + 1)} className="w-8 h-8 rounded-xl bg-[#F0F4F4] flex items-center justify-center">
+                  <IcChevronLeft c="w-4 h-4 text-[#374040]" />
+                </button>
+                <p className="text-[14px] font-bold text-[#1A2424]">{monthNames[currentMonth]} {currentYear}</p>
+                <button onClick={() => setMonthOffset(o => o - 1)} className="w-8 h-8 rounded-xl bg-[#F0F4F4] flex items-center justify-center">
+                  <IcChevronRight c="w-4 h-4 text-[#374040]" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-7 mb-2">
+                {['س', 'ح', 'ن', 'ث', 'ر', 'خ', 'ج'].map((h, i) => (
+                  <div key={i} className="text-center text-[11px] font-bold text-[#8A9E9E] py-1">{h}</div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7 gap-y-0.5">
+                {Array.from({ length: Math.ceil((firstCol + daysInMonth) / 7) * 7 }).map((_, idx) => {
+                  const dayNum = idx - firstCol + 1
+                  const valid = dayNum >= 1 && dayNum <= daysInMonth
+                  const dow = valid ? (firstCol + dayNum - 1) % 7 : -1
+                  const isFri = dow === 6
+                  const isSel = valid && dayNum === selectedDate
+                  const dots = valid ? getDayDots(dayNum) : []
+                  return (
+                    <button key={idx}
+                      onClick={() => { if (!valid) return; setSelectedDate(dayNum); setWeekOffset(0); setSchedTab('weekly') }}
+                      className={cn('flex flex-col items-center py-1 rounded-xl transition-all',
+                        isSel ? 'bg-teal-primary' : valid ? 'hover:bg-[#F0FAF9]' : '')}>
+                      {valid && (
+                        <>
+                          <span className={cn('text-[12px] font-semibold leading-none',
+                            isSel ? 'text-white' : isFri ? 'text-[#C0CCCC]' : 'text-[#1A2424]')}>
+                            {dayNum}
+                          </span>
+                          <div className="flex gap-0.5 mt-0.5 h-1.5 items-center">
+                            {isFri
+                              ? <div className={cn('w-1.5 h-1.5 rounded-full', isSel ? 'bg-white/60' : 'bg-red-300')} />
+                              : dots.length > 0
+                                ? dots.map((t, di) => (
+                                  <div key={di} className={cn('w-1.5 h-1.5 rounded-full',
+                                    isSel ? 'bg-white/70' : t === 'work' ? 'bg-teal-primary' : 'bg-purple-500')} />
+                                ))
+                                : <div className="w-1.5 h-1.5" />
+                            }
+                          </div>
+                        </>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-[#E4EEEE] shadow-sm p-4 flex items-start gap-3">
+              <span className="text-teal-primary text-[16px] flex-shrink-0">ℹ️</span>
+              <p className="text-[12px] text-[#8A9E9E] leading-relaxed text-right flex-1">
+                اضغط على أي تاريخ للعودة إلى العرض الأسبوعي ومراجعة تفاصيل الدوام
+              </p>
+            </div>
+
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-[10px] text-[#8A9E9E]">جميع تحديثات الجدول تُعرض مباشرة للطبيب</span>
+              <span>💚</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ════════════════════════════════════
+          PERIOD DETAIL SHEET
+      ════════════════════════════════════ */}
+      {activePeriod && !showEditPeriod && (
+        <Sheet title="إدارة الفترة" subtitle="يمكنك تعديل أو تكرار أو حذف الفترة المحددة" onClose={() => setActivePeriod(null)}>
+          <div className="flex flex-col gap-4">
+            <div className={cn('rounded-2xl p-4', activePeriod.period.special ? 'bg-purple-50 border border-purple-100' : 'bg-teal-50 border border-teal-100')}>
+              <div className="flex items-center justify-between mb-2">
+                <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full',
+                  activePeriod.period.special ? 'bg-purple-100 text-purple-600' : 'bg-teal-100 text-teal-primary')}>
+                  {activePeriod.period.special ? 'خاص' : 'معتاد'}
+                </span>
+                <p className={cn('text-[17px] font-bold', activePeriod.period.special ? 'text-purple-700' : 'text-teal-primary')}>
+                  {activePeriod.period.label}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-2">
+                <div className="text-right"><p className="text-[10px] text-[#8A9E9E]">الوقت</p><p className="text-[12px] font-bold text-[#1A2424]">{activePeriod.period.from}–{activePeriod.period.to}</p></div>
+                <div className="text-right"><p className="text-[10px] text-[#8A9E9E]">المواعيد</p><p className="text-[12px] font-bold text-[#1A2424]">{activePeriod.period.slots} موعد</p></div>
+                <div className="text-right"><p className="text-[10px] text-[#8A9E9E]">مدة الموعد</p><p className="text-[12px] font-bold text-[#1A2424]">كل {activePeriod.period.dur} دق.</p></div>
+                <div className="text-right"><p className="text-[10px] text-[#8A9E9E]">التكرار</p><p className="text-[12px] font-bold text-[#1A2424]">متكررة أسبوعياً</p></div>
+                <div className="text-right"><p className="text-[10px] text-[#8A9E9E]">الحجز</p><p className="text-[12px] font-bold text-teal-primary">مفعّل للحجز</p></div>
+              </div>
+            </div>
+
+            <div className="bg-[#F8FAFA] rounded-2xl p-4">
+              <p className="text-[13px] font-bold text-[#1A2424] mb-0.5 text-right">إعدادات طرق الحجز</p>
+              <p className="text-[11px] text-[#8A9E9E] mb-3 text-right">تختلف هذه الخيارات من فترة إلى أخرى</p>
+              <div className="bg-white rounded-xl p-3 border border-[#E8F0F0] flex items-center justify-between mb-3">
+                <IcChevronLeft c="w-4 h-4 text-[#B0C4C4]" />
+                <div className="text-right">
+                  <p className="text-[13px] font-bold text-[#1A2424]">{(activePeriod.period.methods || ['حجز موعد']).join(' · ')}</p>
+                  <p className="text-[11px] text-[#8A9E9E]">{activePeriod.period.from}–{activePeriod.period.to} · كل {activePeriod.period.dur} دق. · {activePeriod.period.slots} موعد</p>
+                </div>
+              </div>
+              <button onClick={() => openEdit(activePeriod.period, activePeriod.dayName)}
+                className="w-full py-2.5 rounded-xl border border-teal-200 text-teal-primary text-[13px] font-semibold">
+                تعديل طرق الحجز
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <button onClick={() => openEdit(activePeriod.period, activePeriod.dayName)}
+                className="flex items-center justify-between px-4 py-3.5 rounded-2xl bg-white border border-[#E8F0F0] shadow-sm">
+                <IcChevronLeft c="w-4 h-4 text-[#B0C4C4]" />
+                <div className="text-right">
+                  <p className="text-[13px] font-bold text-[#1A2424]">تعديل الفترة</p>
+                  <p className="text-[11px] text-[#8A9E9E]">تغيير الأوقات أو طرق الحجز</p>
+                </div>
+              </button>
+              <button onClick={() => setActivePeriod(null)}
+                className="flex items-center justify-between px-4 py-3.5 rounded-2xl bg-white border border-[#E8F0F0] shadow-sm">
+                <IcChevronLeft c="w-4 h-4 text-[#B0C4C4]" />
+                <div className="text-right">
+                  <p className="text-[13px] font-bold text-[#1A2424]">تكرار الفترة</p>
+                  <p className="text-[11px] text-[#8A9E9E]">نسخها إلى أيام أو أسابيع أخرى</p>
+                </div>
+              </button>
+              <button onClick={() => deletePeriod(activePeriod.dayName, activePeriod.period.label)}
+                className="flex items-center justify-between px-4 py-3.5 rounded-2xl bg-red-50 border border-red-100">
+                <IcChevronLeft c="w-4 h-4 text-red-300" />
+                <div className="text-right">
+                  <p className="text-[13px] font-bold text-red-500">حذف الفترة</p>
+                  <p className="text-[11px] text-red-400">يمكنك تحديد نطاق التكرار لاحقاً</p>
+                </div>
+              </button>
+            </div>
+          </div>
+        </Sheet>
+      )}
+
+      {/* EDIT PERIOD SHEET */}
+      {showEditPeriod && activePeriod && (
+        <Sheet title="تعديل الفترة" onClose={() => setShowEditPeriod(false)}>
+          <div className="flex flex-col gap-4">
+            <div>
+              <p className="text-[13px] font-bold text-[#1A2424] text-right mb-2">اختر الأيام</p>
+              <DayPicker selected={epDays} setSelected={setEpDays} />
+            </div>
+            <DetailsBlock name={epName} setName={setEpName} from={epFrom} setFrom={setEpFrom} to={epTo} setTo={setEpTo} dur={epDur} setDur={setEpDur} />
+            <RepeatBlock repeat={epRepeat} setRepeat={setEpRepeat} rType={epRepeatType} setRType={setEpRepeatType} />
+            <div className="bg-[#F8FAFA] rounded-2xl p-4 flex items-center justify-between">
+              <Tog on={epBooking} setOn={setEpBooking} />
+              <p className="text-[13px] font-bold text-[#1A2424]">الحجز الإلكتروني مفعّل</p>
+            </div>
+            {epBooking && (
+              <div>
+                <p className="text-[13px] font-bold text-[#1A2424] text-right mb-2">إعدادات طرق الحجز</p>
+                <MethodCards methods={epMethods} setMethods={setEpMethods} />
+              </div>
+            )}
+            <SummaryCard days={epDays} name={epName || 'الفترة'} from={epFrom} to={epTo} dur={epDur} methods={epMethods} />
+            <div className="flex flex-col gap-2 pt-1">
+              <Btn onClick={saveEdit}>حفظ وتطبيق</Btn>
+              <div className="flex gap-2">
+                <button onClick={() => setShowEditPeriod(false)} className="flex-1 py-3 rounded-2xl border border-teal-200 text-teal-primary text-[13px] font-bold">حفظ وتكرار</button>
+                <button onClick={() => setShowEditPeriod(false)} className="flex-1 py-3 rounded-2xl border border-[#E0EDED] text-[#374040] text-[13px] font-bold">حفظ كنموذج</button>
+              </div>
+            </div>
+          </div>
+        </Sheet>
+      )}
+
+      {/* ADD PERIOD SHEET */}
+      {showAddPeriod && (
+        <Sheet title="إضافة فترة معتادة" onClose={() => setShowAddPeriod(false)}>
+          <div className="flex flex-col gap-4">
+            <div>
+              <p className="text-[13px] font-bold text-[#1A2424] text-right mb-2">اختر الأيام</p>
+              <DayPicker selected={apDays} setSelected={setApDays} />
+            </div>
+            <DetailsBlock name={apName} setName={setApName} from={apFrom} setFrom={setApFrom} to={apTo} setTo={setApTo} dur={apDur} setDur={setApDur} />
+            <RepeatBlock repeat={apRepeat} setRepeat={setApRepeat} rType={apRepeatType} setRType={setApRepeatType} />
+            <div className="bg-[#F8FAFA] rounded-2xl p-4 flex items-center justify-between">
+              <Tog on={apBooking} setOn={setApBooking} />
+              <p className="text-[13px] font-bold text-[#1A2424]">الحجز الإلكتروني مفعّل</p>
+            </div>
+            {apBooking && (
+              <div>
+                <p className="text-[13px] font-bold text-[#1A2424] text-right mb-2">إعدادات طرق الحجز</p>
+                <MethodCards methods={apMethods} setMethods={setApMethods} />
+              </div>
+            )}
+            <SummaryCard days={apDays} name={apName || 'الفترة'} from={apFrom} to={apTo} dur={apDur} methods={apMethods} />
+            <div className="flex flex-col gap-2 pt-1">
+              <Btn onClick={addPeriod}>حفظ وتطبيق</Btn>
+              <div className="flex gap-2">
+                <button onClick={addPeriod} className="flex-1 py-3 rounded-2xl border border-teal-200 text-teal-primary text-[13px] font-bold">حفظ وتكرار</button>
+                <button onClick={() => setShowAddPeriod(false)} className="flex-1 py-3 rounded-2xl border border-[#E0EDED] text-[#374040] text-[13px] font-bold">حفظ كنموذج</button>
+              </div>
+            </div>
+          </div>
+        </Sheet>
+      )}
+
+      {/* ADD SPECIAL PERIOD SHEET */}
+      {showAddSpecial && (
+        <Sheet title="إضافة فترة خاصة" onClose={() => setShowAddSpecial(false)}>
+          <div className="flex flex-col gap-4">
+            <div className="bg-purple-50 rounded-2xl p-3.5 border border-purple-100">
+              <p className="text-[12px] text-purple-700 leading-relaxed text-right">
+                الفترة الخاصة لها أولوية على الجدول المعتاد عند التعارض في نفس التوقيت
+              </p>
+            </div>
+            <div>
+              <p className="text-[13px] font-bold text-[#1A2424] text-right mb-2">اليوم</p>
+              <DayPicker selected={[spDay]} setSelected={v => setSpDay(v[0] || 'السبت')} multi={false} />
+            </div>
+            <DetailsBlock name={spName} setName={setSpName} from={spFrom} setFrom={setSpFrom} to={spTo} setTo={setSpTo} dur={spDur} setDur={setSpDur} />
+            <div className="bg-[#F8FAFA] rounded-2xl p-4 flex items-center justify-between">
+              <Tog on={spBooking} setOn={setSpBooking} />
+              <p className="text-[13px] font-bold text-[#1A2424]">الحجز الإلكتروني مفعّل</p>
+            </div>
+            {spBooking && (
+              <div>
+                <p className="text-[13px] font-bold text-[#1A2424] text-right mb-2">إعدادات طرق الحجز</p>
+                <MethodCards methods={spMethods} setMethods={setSpMethods} />
+              </div>
+            )}
+            <SummaryCard days={[spDay]} name={spName || 'الفترة الخاصة'} from={spFrom} to={spTo} dur={spDur} methods={spMethods} />
+            <button onClick={addSpecialPeriod} className="w-full py-3.5 rounded-2xl bg-purple-600 text-white text-[14px] font-bold">
+              حفظ وتطبيق لهذا الأسبوع
+            </button>
+          </div>
+        </Sheet>
+      )}
+
+      {/* TEMPLATES SHEET */}
+      {showTemplates && (
+        <Sheet title="النماذج المحفوظة" onClose={() => setShowTemplates(false)}>
+          <div className="flex flex-col gap-3">
+            {[
+              { name: 'جدول العيادة المعتاد', desc: 'صباحي + مسائي · 5 أيام' },
+              { name: 'دوام رمضان', desc: 'فترة واحدة · 5 أيام' },
+            ].map(t => (
+              <div key={t.name} className="bg-white rounded-2xl border border-[#E4EEEE] shadow-sm px-4 py-4 flex items-center gap-3">
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button className="text-[11px] text-red-400 font-semibold border border-red-100 rounded-xl px-3 py-1.5">حذف</button>
+                  <button
+                    onClick={() => { setPreviewName(t.name); setIsPreviewMode(true); setShowTemplates(false) }}
+                    className="text-[11px] text-teal-primary font-semibold border border-teal-200 rounded-xl px-3 py-1.5">معاينة</button>
+                </div>
+                <div className="text-right flex-1">
+                  <p className="text-[14px] font-bold text-[#1A2424]">{t.name}</p>
+                  <p className="text-[12px] text-[#8A9E9E] mt-0.5">{t.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Sheet>
+      )}
+
+      {/* HOLIDAY SHEET */}
+      {showHoliday && (
+        <Sheet title="إجازة مجدولة" onClose={() => setShowHoliday(false)}>
+          <div className="flex flex-col gap-4">
+            <div>
+              <p className="text-[13px] font-bold text-[#1A2424] text-right mb-2">نطاق الإجازة</p>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="text-[11px] font-semibold text-[#374040] block mb-1 text-right">من تاريخ</label>
+                  <input type="date" value={hlFrom} onChange={e => setHlFrom(e.target.value)}
+                    className="w-full bg-[#F8FAFA] border border-[#E0EDED] rounded-xl px-3 py-2.5 text-[12px] focus:outline-none focus:border-amber-400" />
+                </div>
+                <div className="flex-1">
+                  <label className="text-[11px] font-semibold text-[#374040] block mb-1 text-right">إلى تاريخ</label>
+                  <input type="date" value={hlTo} onChange={e => setHlTo(e.target.value)}
+                    className="w-full bg-[#F8FAFA] border border-[#E0EDED] rounded-xl px-3 py-2.5 text-[12px] focus:outline-none focus:border-amber-400" />
+                </div>
+              </div>
+            </div>
+            <div>
+              <p className="text-[13px] font-bold text-[#1A2424] text-right mb-2">نطاق الإغلاق</p>
+              <div className="flex flex-col gap-1.5">
+                {([['full', 'اليوم كامل'], ['period', 'فترة محددة']] as const).map(([id, lbl]) => (
+                  <button key={id} onClick={() => setHlMode(id)}
+                    className={cn('flex items-center gap-3 px-4 py-3 rounded-xl border text-right',
+                      hlMode === id ? 'bg-amber-50 border-amber-300' : 'bg-[#F8FAFA] border-[#E0EDED]')}>
+                    <div className={cn('w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center',
+                      hlMode === id ? 'border-amber-500' : 'border-[#C0D4D4]')}>
+                      {hlMode === id && <div className="w-2 h-2 rounded-full bg-amber-500" />}
+                    </div>
+                    <span className="text-[13px] font-semibold text-[#1A2424]">{lbl}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            {hlFrom && hlTo && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5">
+                <p className="text-[12px] font-bold text-amber-700 text-right mb-1">توجد حجوزات مرضى متأثرة</p>
+                <p className="text-[11px] text-amber-600 leading-relaxed text-right">
+                  يُرجى التواصل مع المرضى المتأثرين يدوياً قبل تأكيد الإجازة. لن يتم إلغاء الحجوزات تلقائياً.
+                </p>
+              </div>
+            )}
+            <div>
+              <label className="text-[12px] font-semibold text-[#374040] block mb-1.5 text-right">السبب (اختياري)</label>
+              <input value={hlReason} onChange={e => setHlReason(e.target.value)} placeholder="مثال: مؤتمر طبي، سفر..."
+                className="w-full bg-[#F8FAFA] border border-[#E0EDED] rounded-xl px-4 py-3 text-[13px] focus:outline-none focus:border-amber-400 text-right" />
+            </div>
+            <button onClick={() => setShowHoliday(false)} className="w-full py-3.5 rounded-2xl bg-amber-500 text-white text-[14px] font-bold">
+              {hlFrom && hlTo ? `حفظ وتطبيق من ${hlFrom} إلى ${hlTo}` : 'حفظ وتطبيق'}
+            </button>
+          </div>
+        </Sheet>
+      )}
+
+      {/* EMERGENCY SHEET */}
+      {showEmergency && (
+        <Sheet title="إجازة طارئة" onClose={() => setShowEmergency(false)}>
+          <div className="flex flex-col gap-4">
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+              <p className="text-[13px] font-bold text-red-700 mb-1 text-right">تنبيه مهم</p>
+              <p className="text-[12px] text-red-600 leading-relaxed text-right">
+                إغلاق الجدول الطارئ لن يُلغي الحجوزات الموجودة تلقائياً. يُرجى التواصل مع المرضى المتأثرين يدوياً.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              {([['day', 'إغلاق اليوم بالكامل'], ['period', 'إغلاق فترة محددة']] as const).map(([id, lbl]) => (
+                <button key={id} onClick={() => setEmMode(id)}
+                  className={cn('flex items-center gap-3 px-4 py-3.5 rounded-2xl border text-right',
+                    emMode === id ? 'bg-red-50 border-red-300' : 'bg-[#F8FAFA] border-[#E0EDED]')}>
+                  <div className={cn('w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center',
+                    emMode === id ? 'border-red-500' : 'border-[#C0D4D4]')}>
+                    {emMode === id && <div className="w-2.5 h-2.5 rounded-full bg-red-500" />}
+                  </div>
+                  <span className="text-[14px] font-semibold text-[#1A2424]">{lbl}</span>
+                </button>
+              ))}
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5">
+              <p className="text-[12px] font-bold text-amber-700 text-right">توجد حجوزات مرضى متأثرة</p>
+              <p className="text-[11px] text-amber-600 mt-1 text-right">4 مرضى لديهم مواعيد في هذا اليوم</p>
+            </div>
+            <button onClick={() => setShowEmergency(false)} className="w-full py-3.5 rounded-2xl bg-red-500 text-white text-[14px] font-bold">
+              تأكيد الإغلاق الطارئ
+            </button>
+          </div>
+        </Sheet>
+      )}
+
+      {/* LOCATION SHEET */}
+      {showLocSheet && (
+        <Sheet title="اختر موقع العمل" onClose={() => setShowLocSheet(false)}>
+          <div className="flex flex-col gap-2">
+            {locations.map(loc => (
+              <button key={loc.id} onClick={() => { setLocId(loc.id); setShowLocSheet(false) }}
+                className={cn('flex items-center justify-between px-4 py-3.5 rounded-2xl border',
+                  locId === loc.id ? 'bg-teal-50 border-teal-primary' : 'bg-white border-[#E8F0F0]')}>
+                <div className={cn('w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center',
+                  locId === loc.id ? 'border-teal-primary' : 'border-[#C0D4D4]')}>
+                  {locId === loc.id && <div className="w-2.5 h-2.5 rounded-full bg-teal-primary" />}
+                </div>
+                <div className="text-right">
+                  <p className="text-[14px] font-bold text-[#1A2424]">{loc.name}</p>
+                  <p className="text-[12px] text-[#8A9E9E]">{loc.dept} · {loc.city}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </Sheet>
+      )}
+    </div>
+  )
+}
 
 function PatientsScreen({ nav }: { nav: (s: Screen) => void }) {
   const patients = [
@@ -4556,7 +5297,8 @@ export default function App() {
     if (s === 'register') setOnboardingMode(true)
     if (s === 'welcome' || s === 'login') setOnboardingMode(false)
     if (s === 'home') { setOnboardingMode(false); setActiveTab('home') }
-    else if (s === 'appointments' || s === 'bookings' || s === 'booking-details' || s === 'booking-checkin' || s === 'booking-cancel' || s === 'reschedule' || s === 'reschedule-success' || s === 'weekly-schedule' || s === 'schedule-30day') setActiveTab('appointments')
+    else if (s === 'bookings' || s === 'booking-details' || s === 'booking-checkin' || s === 'booking-cancel' || s === 'reschedule' || s === 'reschedule-success') setActiveTab('bookings')
+    else if (s === 'appointments' || s === 'weekly-schedule' || s === 'schedule-30day' || s === 'day-editor' || s === 'session-editor' || s === 'holiday-block' || s === 'confirmation-policy') setActiveTab('appointments')
     else if (s === 'messages') setActiveTab('messages')
     else if (s === 'more' || s === 'patients' || s === 'patient-controls' || s === 'finance' || s === 'finance-transactions' || s === 'finance-payment-settings' || s === 'profile-basic-edit' || s === 'profile-professional' || s === 'profile-license' || s === 'profile-qualifications' || s === 'profile-experience' || s === 'profile-certificates') setActiveTab('more')
   }
@@ -4565,6 +5307,7 @@ export default function App() {
     setActiveTab(tab)
     const tabScreens: Record<NavTab, Screen> = {
       home: 'home',
+      bookings: 'bookings',
       appointments: 'appointments',
       messages: 'messages',
       more: 'more',
@@ -4602,7 +5345,7 @@ export default function App() {
       case 'location-add-choice': return <LocationAddChoiceScreen nav={nav} />
       case 'location-search': return <LocationSearchScreen nav={nav} />
       case 'location-info': return <LocationInfoScreen nav={nav} />
-      case 'weekly-schedule': return <WeeklyScheduleScreen nav={nav} onboarding={onboardingMode} />
+      case 'weekly-schedule': return <AppointmentsScreen nav={nav} onboarding={onboardingMode} />
       case 'schedule-30day': return <Schedule30DayScreen nav={nav} />
       case 'day-editor': return <DayEditorScreen nav={nav} />
       case 'conflict-review': return <ConflictReviewScreen nav={nav} />
@@ -4621,7 +5364,8 @@ export default function App() {
       case 'finance': return <FinanceScreen nav={nav} />
       case 'finance-transactions': return <FinanceTransactionsScreen nav={nav} />
       case 'finance-payment-settings': return <FinancePaymentSettingsScreen nav={nav} />
-      case 'appointments': return <AppointmentsScreen nav={nav} />
+      case 'appointments': return <AppointmentsScreen nav={nav} onboarding={onboardingMode} />
+      case 'weekly-schedule': return <AppointmentsScreen nav={nav} onboarding={onboardingMode} />
       case 'patients': return <PatientsScreen nav={nav} />
       case 'messages': return <MessagesScreen nav={nav} />
       case 'more': return <MoreScreen nav={nav} />
